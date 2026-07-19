@@ -101,36 +101,57 @@
     flex-direction: column;
     gap: 6px;
   }
-  li.item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 8px;
+  li.item-wrapper {
     border-radius: 10px;
     transition: background 0.15s;
   }
-  li.item:hover {
+  li.item-wrapper:hover {
     background: #f8f9fb;
   }
-  li.item input[type="checkbox"] {
+  .item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 8px;
+  }
+  .item .expand-btn {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 11px;
+    cursor: pointer;
+    padding: 4px;
+    flex-shrink: 0;
+    width: 18px;
+    text-align: center;
+  }
+  .item input[type="checkbox"] {
     width: 20px;
     height: 20px;
     flex-shrink: 0;
     accent-color: var(--accent);
     cursor: pointer;
   }
-  li.item .text {
+  .item .text {
     flex: 1;
     font-size: 15px;
     word-break: break-word;
     outline: none;
     cursor: text;
   }
-  li.item.done .text {
+  .item.done .text {
     color: var(--done);
     text-decoration: line-through;
   }
-  li.item .delete-btn {
+  .item .sub-count {
+    font-size: 12px;
+    color: var(--muted);
+    flex-shrink: 0;
+    background: var(--bg);
+    padding: 2px 7px;
+    border-radius: 20px;
+  }
+  .item .delete-btn {
     border: none;
     background: transparent;
     color: var(--muted);
@@ -141,9 +162,83 @@
     line-height: 1;
     flex-shrink: 0;
   }
-  li.item .delete-btn:hover {
+  .item .delete-btn:hover {
     color: var(--danger);
     background: #fdecea;
+  }
+  .subtasks {
+    padding: 0 8px 10px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .subtask-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+  }
+  .subtask-row input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .subtask-row .text {
+    flex: 1;
+    font-size: 13px;
+    word-break: break-word;
+    outline: none;
+    cursor: text;
+  }
+  .subtask-row.done .text {
+    color: var(--done);
+    text-decoration: line-through;
+  }
+  .subtask-row .delete-btn {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 2px 5px;
+    border-radius: 6px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .subtask-row .delete-btn:hover {
+    color: var(--danger);
+    background: #fdecea;
+  }
+  .subtask-add {
+    display: flex;
+    gap: 6px;
+    margin-top: 2px;
+  }
+  .subtask-add input[type="text"] {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    outline: none;
+  }
+  .subtask-add input[type="text"]:focus {
+    border-color: var(--accent);
+  }
+  .subtask-add button {
+    padding: 0 12px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .subtask-add button:hover {
+    background: var(--accent-hover);
   }
   .empty {
     text-align: center;
@@ -199,6 +294,7 @@
   const STORAGE_KEY = 'todo-list-items-v1';
   let todos = load();
   let filter = 'all';
+  const expandedIds = new Set();
 
   const listEl = document.getElementById('list');
   const inputEl = document.getElementById('newTodoInput');
@@ -228,7 +324,7 @@
   function addTodo(text) {
     const trimmed = text.trim();
     if (!trimmed) return;
-    todos.unshift({ id: uid(), text: trimmed, done: false });
+    todos.unshift({ id: uid(), text: trimmed, done: false, subtasks: [] });
     save();
     render();
   }
@@ -262,6 +358,53 @@
     render();
   }
 
+  function toggleExpand(id) {
+    if (expandedIds.has(id)) {
+      expandedIds.delete(id);
+    } else {
+      expandedIds.add(id);
+    }
+    render();
+  }
+
+  function addSubtask(todoId, text) {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const t = todos.find(t => t.id === todoId);
+    if (!t) return;
+    if (!t.subtasks) t.subtasks = [];
+    t.subtasks.push({ id: uid(), text: trimmed, done: false });
+    save();
+    render();
+  }
+
+  function toggleSubtask(todoId, subId) {
+    const t = todos.find(t => t.id === todoId);
+    const s = t && t.subtasks.find(s => s.id === subId);
+    if (s) { s.done = !s.done; save(); render(); }
+  }
+
+  function deleteSubtask(todoId, subId) {
+    const t = todos.find(t => t.id === todoId);
+    if (!t) return;
+    t.subtasks = t.subtasks.filter(s => s.id !== subId);
+    save();
+    render();
+  }
+
+  function editSubtask(todoId, subId, newText) {
+    const t = todos.find(t => t.id === todoId);
+    const s = t && t.subtasks.find(s => s.id === subId);
+    if (!s) return;
+    const trimmed = newText.trim();
+    if (!trimmed) {
+      deleteSubtask(todoId, subId);
+      return;
+    }
+    s.text = trimmed;
+    save();
+  }
+
   function render() {
     listEl.innerHTML = '';
     const filtered = todos.filter(t => {
@@ -271,8 +414,20 @@
     });
 
     filtered.forEach(t => {
-      const li = document.createElement('li');
-      li.className = 'item' + (t.done ? ' done' : '');
+      const subtasks = t.subtasks || [];
+      const isExpanded = expandedIds.has(t.id);
+
+      const wrapper = document.createElement('li');
+      wrapper.className = 'item-wrapper';
+
+      const row = document.createElement('div');
+      row.className = 'item' + (t.done ? ' done' : '');
+
+      const expandBtn = document.createElement('button');
+      expandBtn.className = 'expand-btn';
+      expandBtn.textContent = isExpanded ? '▾' : '▸';
+      expandBtn.title = 'サブタスクを表示';
+      expandBtn.addEventListener('click', () => toggleExpand(t.id));
 
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
@@ -292,16 +447,95 @@
         }
       });
 
+      row.appendChild(expandBtn);
+      row.appendChild(checkbox);
+      row.appendChild(span);
+
+      if (subtasks.length > 0) {
+        const doneCount = subtasks.filter(s => s.done).length;
+        const badge = document.createElement('span');
+        badge.className = 'sub-count';
+        badge.textContent = `${doneCount}/${subtasks.length}`;
+        row.appendChild(badge);
+      }
+
       const delBtn = document.createElement('button');
       delBtn.className = 'delete-btn';
       delBtn.textContent = '✕';
       delBtn.title = '削除';
       delBtn.addEventListener('click', () => deleteTodo(t.id));
+      row.appendChild(delBtn);
 
-      li.appendChild(checkbox);
-      li.appendChild(span);
-      li.appendChild(delBtn);
-      listEl.appendChild(li);
+      wrapper.appendChild(row);
+
+      if (isExpanded) {
+        const subPanel = document.createElement('div');
+        subPanel.className = 'subtasks';
+
+        subtasks.forEach(s => {
+          const subRow = document.createElement('div');
+          subRow.className = 'subtask-row' + (s.done ? ' done' : '');
+
+          const subCheckbox = document.createElement('input');
+          subCheckbox.type = 'checkbox';
+          subCheckbox.checked = s.done;
+          subCheckbox.addEventListener('change', () => toggleSubtask(t.id, s.id));
+
+          const subSpan = document.createElement('span');
+          subSpan.className = 'text';
+          subSpan.textContent = s.text;
+          subSpan.contentEditable = 'true';
+          subSpan.spellcheck = false;
+          subSpan.addEventListener('blur', () => editSubtask(t.id, s.id, subSpan.textContent));
+          subSpan.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              subSpan.blur();
+            }
+          });
+
+          const subDelBtn = document.createElement('button');
+          subDelBtn.className = 'delete-btn';
+          subDelBtn.textContent = '✕';
+          subDelBtn.title = '削除';
+          subDelBtn.addEventListener('click', () => deleteSubtask(t.id, s.id));
+
+          subRow.appendChild(subCheckbox);
+          subRow.appendChild(subSpan);
+          subRow.appendChild(subDelBtn);
+          subPanel.appendChild(subRow);
+        });
+
+        const addRow = document.createElement('div');
+        addRow.className = 'subtask-add';
+
+        const addInput = document.createElement('input');
+        addInput.type = 'text';
+        addInput.placeholder = '項目を追加(例: 牛乳)';
+        addInput.maxLength = 200;
+
+        const addBtnSub = document.createElement('button');
+        addBtnSub.textContent = '追加';
+
+        const submitSubtask = () => {
+          addSubtask(t.id, addInput.value);
+        };
+        addBtnSub.addEventListener('click', submitSubtask);
+        addInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            submitSubtask();
+          }
+        });
+
+        addRow.appendChild(addInput);
+        addRow.appendChild(addBtnSub);
+        subPanel.appendChild(addRow);
+
+        wrapper.appendChild(subPanel);
+      }
+
+      listEl.appendChild(wrapper);
     });
 
     emptyMsg.style.display = filtered.length === 0 ? 'block' : 'none';
