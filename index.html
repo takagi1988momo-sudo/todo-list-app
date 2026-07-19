@@ -32,7 +32,7 @@
     max-width: 480px;
   }
   h1 {
-    font-size: 24px;
+    font-size: 26px;
     margin: 0 0 20px;
     font-weight: 700;
   }
@@ -52,7 +52,7 @@
     padding: 12px 14px;
     border: 1px solid var(--border);
     border-radius: 10px;
-    font-size: 15px;
+    font-size: 17px;
     outline: none;
     transition: border-color 0.15s;
   }
@@ -65,7 +65,7 @@
     border-radius: 10px;
     background: var(--accent);
     color: white;
-    font-size: 15px;
+    font-size: 17px;
     font-weight: 600;
     cursor: pointer;
     transition: background 0.15s;
@@ -84,7 +84,7 @@
     border: 1px solid var(--border);
     background: transparent;
     border-radius: 8px;
-    font-size: 13px;
+    font-size: 15px;
     color: var(--muted);
     cursor: pointer;
   }
@@ -111,30 +111,19 @@
   .item {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 10px;
     padding: 10px 8px;
   }
-  .item .expand-btn {
-    border: none;
-    background: transparent;
-    color: var(--muted);
-    font-size: 11px;
-    cursor: pointer;
-    padding: 4px;
-    flex-shrink: 0;
-    width: 18px;
-    text-align: center;
-  }
   .item input[type="checkbox"] {
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
     flex-shrink: 0;
     accent-color: var(--accent);
     cursor: pointer;
   }
   .item .text {
     flex: 1;
-    font-size: 15px;
+    font-size: 18px;
     word-break: break-word;
     outline: none;
     cursor: text;
@@ -144,7 +133,7 @@
     text-decoration: line-through;
   }
   .item .sub-count {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--muted);
     flex-shrink: 0;
     background: var(--bg);
@@ -155,7 +144,7 @@
     border: none;
     background: transparent;
     color: var(--muted);
-    font-size: 18px;
+    font-size: 20px;
     cursor: pointer;
     padding: 4px 6px;
     border-radius: 6px;
@@ -167,10 +156,10 @@
     background: #fdecea;
   }
   .subtasks {
-    padding: 0 8px 10px 40px;
+    padding: 0 8px 12px 32px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
   }
   .subtask-row {
     display: flex;
@@ -179,15 +168,15 @@
     padding: 4px 0;
   }
   .subtask-row input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     flex-shrink: 0;
     accent-color: var(--accent);
     cursor: pointer;
   }
   .subtask-row .text {
     flex: 1;
-    font-size: 13px;
+    font-size: 16px;
     word-break: break-word;
     outline: none;
     cursor: text;
@@ -200,7 +189,7 @@
     border: none;
     background: transparent;
     color: var(--muted);
-    font-size: 14px;
+    font-size: 16px;
     cursor: pointer;
     padding: 2px 5px;
     border-radius: 6px;
@@ -218,10 +207,10 @@
   }
   .subtask-add input[type="text"] {
     flex: 1;
-    padding: 6px 10px;
+    padding: 7px 10px;
     border: 1px solid var(--border);
     border-radius: 8px;
-    font-size: 13px;
+    font-size: 15px;
     outline: none;
   }
   .subtask-add input[type="text"]:focus {
@@ -233,7 +222,7 @@
     border-radius: 8px;
     background: var(--accent);
     color: white;
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 600;
     cursor: pointer;
   }
@@ -243,7 +232,7 @@
   .empty {
     text-align: center;
     color: var(--muted);
-    font-size: 14px;
+    font-size: 15px;
     padding: 24px 0;
   }
   .footer {
@@ -251,14 +240,14 @@
     justify-content: space-between;
     align-items: center;
     margin-top: 14px;
-    font-size: 13px;
+    font-size: 14px;
     color: var(--muted);
   }
   .footer button {
     border: none;
     background: transparent;
     color: var(--muted);
-    font-size: 13px;
+    font-size: 14px;
     cursor: pointer;
     text-decoration: underline;
   }
@@ -294,7 +283,6 @@
   const STORAGE_KEY = 'todo-list-items-v1';
   let todos = load();
   let filter = 'all';
-  const expandedIds = new Set();
 
   const listEl = document.getElementById('list');
   const inputEl = document.getElementById('newTodoInput');
@@ -358,15 +346,6 @@
     render();
   }
 
-  function toggleExpand(id) {
-    if (expandedIds.has(id)) {
-      expandedIds.delete(id);
-    } else {
-      expandedIds.add(id);
-    }
-    render();
-  }
-
   function addSubtask(todoId, text) {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -415,19 +394,12 @@
 
     filtered.forEach(t => {
       const subtasks = t.subtasks || [];
-      const isExpanded = expandedIds.has(t.id);
 
       const wrapper = document.createElement('li');
       wrapper.className = 'item-wrapper';
 
       const row = document.createElement('div');
       row.className = 'item' + (t.done ? ' done' : '');
-
-      const expandBtn = document.createElement('button');
-      expandBtn.className = 'expand-btn';
-      expandBtn.textContent = isExpanded ? '▾' : '▸';
-      expandBtn.title = 'サブタスクを表示';
-      expandBtn.addEventListener('click', () => toggleExpand(t.id));
 
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
@@ -447,7 +419,6 @@
         }
       });
 
-      row.appendChild(expandBtn);
       row.appendChild(checkbox);
       row.appendChild(span);
 
@@ -468,7 +439,7 @@
 
       wrapper.appendChild(row);
 
-      if (isExpanded) {
+      {
         const subPanel = document.createElement('div');
         subPanel.className = 'subtasks';
 
