@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>図形計算サイト</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card-bg: #ffffff;
+    --text: #1f2430;
+    --muted: #8a8f9c;
+    --accent: #4f6df5;
+    --accent-hover: #3d59db;
+    --border: #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 40px 16px;
+    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    color: var(--text);
+  }
+  .app {
+    width: 100%;
+    max-width: 560px;
+  }
+  .top-nav {
+    margin-bottom: 12px;
+  }
+  .top-nav a {
+    color: var(--muted);
+    font-size: 14px;
+    text-decoration: none;
+  }
+  .top-nav a:hover {
+    color: var(--accent);
+  }
+  h1 {
+    font-size: 26px;
+    margin: 0 0 4px;
+    font-weight: 700;
+  }
+  p.desc {
+    margin: 0 0 24px;
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .tools {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  a.tool-card {
+    display: block;
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 18px 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.04);
+    text-decoration: none;
+    color: var(--text);
+    border: 1.5px solid transparent;
+    transition: border-color 0.15s, transform 0.1s;
+  }
+  a.tool-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+  }
+  .tool-card .title {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tool-card .sub {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .tool-card .icon {
+    font-size: 22px;
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="top-nav"><a href="index.html">← TODOリスト</a></div>
+    <h1>🧮 図形計算サイト</h1>
+    <p class="desc">図形に数値を入力すると、その形になって答えを計算してくれるツール集です。</p>
+    <div class="tools">
+      <a class="tool-card" href="triangle.html">
+        <div class="title"><span class="icon">🔺</span>三角形計算機</div>
+        <div class="sub">三角形の図に辺の長さや角度を入力すると、実際にその形になり、残りの辺・角度・面積を計算します。</div>
+      </a>
+      <a class="tool-card" href="framing.html">
+        <div class="title"><span class="icon">🪵</span>枠割り付け・溶接ピッチ計算</div>
+        <div class="sub">木材・鉄骨で四角い枠を組むときの中柱の均等な位置、溶接箇所の等ピッチ配置を、図と数値で計算します。</div>
+      </a>
+    </div>
+  </div>
+</body>
+</html>

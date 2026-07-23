@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>枠割り付け計算</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card-bg: #ffffff;
+    --text: #1f2430;
+    --muted: #8a8f9c;
+    --accent: #4f6df5;
+    --accent-hover: #3d59db;
+    --border: #e5e7eb;
+    --danger: #e5533d;
+    --frame: #b98a55;
+    --frame-line: #8a5f30;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 40px 16px;
+    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    color: var(--text);
+  }
+  .app {
+    width: 100%;
+    max-width: 560px;
+  }
+  .top-nav {
+    margin-bottom: 12px;
+    display: flex;
+    gap: 14px;
+  }
+  .top-nav a {
+    color: var(--muted);
+    font-size: 14px;
+    text-decoration: none;
+  }
+  .top-nav a:hover {
+    color: var(--accent);
+  }
+  h1 {
+    font-size: 24px;
+    margin: 0 0 4px;
+    font-weight: 700;
+  }
+  p.desc {
+    margin: 0 0 20px;
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.04);
+  }
+  .section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+    margin: 0 0 8px;
+  }
+  .input-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .input-grid .full {
+    grid-column: 1 / -1;
+  }
+  .field-box label {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+  .field-box input {
+    width: 100%;
+    padding: 10px 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    outline: none;
+  }
+  .field-box input:focus {
+    border-color: var(--accent);
+  }
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .actions button {
+    flex: 1;
+    padding: 12px 0;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #calcBtn {
+    background: var(--accent);
+    color: white;
+  }
+  #calcBtn:hover {
+    background: var(--accent-hover);
+  }
+  #resetBtn {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border) !important;
+  }
+  #resetBtn:hover {
+    color: var(--danger);
+    border-color: var(--danger) !important;
+  }
+  .message {
+    font-size: 14px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    margin-bottom: 14px;
+    display: none;
+  }
+  .message.error {
+    display: block;
+    background: #fdecea;
+    color: var(--danger);
+  }
+  .diagram-wrap {
+    width: 100%;
+    aspect-ratio: 480 / 380;
+    margin-bottom: 16px;
+    display: none;
+  }
+  .diagram-wrap.show { display: block; }
+  .diagram-wrap svg { width: 100%; height: 100%; display: block; }
+  .diagram-wrap.weld { aspect-ratio: 480 / 150; }
+  h2.tool-title {
+    font-size: 19px;
+    margin: 28px 0 4px;
+    font-weight: 700;
+  }
+  .result {
+    display: none;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+  .result.show { display: block; }
+  .result h3 {
+    font-size: 14px;
+    margin: 0 0 8px;
+  }
+  table.pitch-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+    font-size: 13px;
+  }
+  table.pitch-table th, table.pitch-table td {
+    padding: 6px 8px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+  }
+  table.pitch-table th:first-child, table.pitch-table td:first-child {
+    text-align: left;
+  }
+  table.pitch-table th {
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .summary-line {
+    font-size: 13px;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .summary-line strong {
+    color: var(--accent-hover);
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="top-nav">
+      <a href="tools.html">← 図形計算サイト</a>
+      <a href="triangle.html">🔺 三角形計算機</a>
+    </div>
+    <h1>🪵 枠割り付け計算</h1>
+    <p class="desc">木材・鉄骨で四角い枠を組むとき、外枠のサイズと材の幅、中に入れる柱(桟)の本数から、均等なピッチと各柱の端の位置(外枠の端からの距離)を計算します。外枠と中柱の厚みが違う場合も別々に入力できます。</p>
+    <div class="card">
+      <div class="section-title">枠のサイズと材の幅</div>
+      <div class="input-grid">
+        <div class="field-box"><label>外枠 横幅 W(mm)</label><input type="number" step="any" id="iW" placeholder="例: 1000"></div>
+        <div class="field-box"><label>外枠 縦幅 H(mm)</label><input type="number" step="any" id="iH" placeholder="例: 500"></div>
+        <div class="field-box"><label>外枠の材の幅(厚み)(mm)</label><input type="number" step="any" id="iT" placeholder="例: 50"></div>
+        <div class="field-box"><label>中柱・桟の幅(厚み)(mm) ※空欄で外枠と同じ</label><input type="number" step="any" id="iTIn" placeholder="例: 40"></div>
+      </div>
+      <div class="section-title">中柱(桟)の本数</div>
+      <div class="input-grid">
+        <div class="field-box"><label>横方向(幅Wの中に入れる柱)</label><input type="number" step="1" min="0" id="iNW" placeholder="例: 2"></div>
+        <div class="field-box"><label>縦方向(高さHの中に入れる桟)</label><input type="number" step="1" min="0" id="iNH" placeholder="例: 0"></div>
+      </div>
+      <div class="actions">
+        <button id="calcBtn">計算する</button>
+        <button id="resetBtn">リセット</button>
+      </div>
+      <div class="message" id="message"></div>
+
+      <div class="diagram-wrap" id="diagramWrap">
+        <svg id="svg" viewBox="0 0 480 380"></svg>
+      </div>
+
+      <div class="result" id="result">
+        <div class="summary-line">内寸(横): <strong id="sInnerW"></strong> mm / 内寸(縦): <strong id="sInnerH"></strong> mm</div>
+        <div id="widthResultBlock">
+          <h3>横方向の柱(ピッチ: <span id="sPitchW"></span> mm、柱の長さ: <span id="sStudLenW"></span> mm)</h3>
+          <table class="pitch-table" id="tableW">
+            <thead><tr><th>柱</th><th>中心(左端から)</th><th>左端</th><th>右端</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="heightResultBlock">
+          <h3>縦方向の桟(ピッチ: <span id="sPitchH"></span> mm、桟の長さ: <span id="sStudLenH"></span> mm)</h3>
+          <table class="pitch-table" id="tableH">
+            <thead><tr><th>桟</th><th>中心(下端から)</th><th>下端</th><th>上端</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="tool-title">🔩 溶接ピッチ計算</h2>
+    <p class="desc">全体の長さ・両端の余白・溶接幅・箇所数から、溶接ピッチと各溶接の位置(端からの距離)を計算します。1か所目は端の余白の直後に固定し、最後の溶接が反対側の余白の手前でぴったり収まるように等ピッチで配置します。</p>
+    <div class="card">
+      <div class="section-title">溶接の条件</div>
+      <div class="input-grid">
+        <div class="field-box"><label>全体の長さ L(mm)</label><input type="number" step="any" id="wL" placeholder="例: 1000"></div>
+        <div class="field-box"><label>両端の余白 e(mm)</label><input type="number" step="any" id="wE" placeholder="例: 50"></div>
+        <div class="field-box"><label>溶接幅 w(mm)</label><input type="number" step="any" id="wW" placeholder="例: 20"></div>
+        <div class="field-box"><label>溶接箇所数 n</label><input type="number" step="1" min="1" id="wN" placeholder="例: 6"></div>
+      </div>
+      <div class="actions">
+        <button id="weldCalcBtn">計算する</button>
+        <button id="weldResetBtn">リセット</button>
+      </div>
+      <div class="message" id="weldMessage"></div>
+
+      <div class="diagram-wrap weld" id="weldDiagramWrap">
+        <svg id="weldSvg" viewBox="0 0 480 150"></svg>
+      </div>
+
+      <div class="result" id="weldResult">
+        <div class="summary-line">有効長さ(余白を除く): <strong id="wInner"></strong> mm / ピッチ(開始位置の間隔): <strong id="wPitch"></strong> mm</div>
+        <table class="pitch-table" id="weldTable">
+          <thead><tr><th>箇所</th><th>開始位置</th><th>終了位置</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  const VBW = 480, VBH = 380;
+
+  const el = {
+    W: document.getElementById('iW'),
+    H: document.getElementById('iH'),
+    T: document.getElementById('iT'),
+    TIn: document.getElementById('iTIn'),
+    NW: document.getElementById('iNW'),
+    NH: document.getElementById('iNH')
+  };
+  const calcBtn = document.getElementById('calcBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const messageEl = document.getElementById('message');
+  const diagramWrap = document.getElementById('diagramWrap');
+  const svg = document.getElementById('svg');
+  const resultEl = document.getElementById('result');
+  const widthBlock = document.getElementById('widthResultBlock');
+  const heightBlock = document.getElementById('heightResultBlock');
+
+  function fmt(n) {
+    return Math.round(n * 100) / 100;
+  }
+
+  function showMessage(text) {
+    messageEl.textContent = text;
+    messageEl.className = 'message' + (text ? ' error' : '');
+  }
+
+  function computeAxis(total, tOuter, tInner, n) {
+    const inner = total - 2 * tOuter;
+    if (inner <= 0) throw new Error('材の幅に対して枠のサイズが小さすぎます');
+    if (n <= 0) return { inner, pitch: null, posts: [] };
+    const pitch = inner / (n + 1);
+    if (tInner >= pitch) throw new Error('本数が多すぎて柱(桟)同士が重なります');
+    const posts = [];
+    for (let i = 1; i <= n; i++) {
+      const centerRel = pitch * i;
+      const centerAbs = tOuter + centerRel;
+      posts.push({
+        index: i,
+        centerRel,
+        leftAbs: centerAbs - tInner / 2,
+        rightAbs: centerAbs + tInner / 2
+      });
+    }
+    return { inner, pitch, posts };
+  }
+
+  function calculate() {
+    const W = parseFloat(el.W.value);
+    const H = parseFloat(el.H.value);
+    const tOuter = parseFloat(el.T.value);
+    const tInner = el.TIn.value === '' ? tOuter : parseFloat(el.TIn.value);
+    const nW = el.NW.value === '' ? 0 : parseInt(el.NW.value, 10);
+    const nH = el.NH.value === '' ? 0 : parseInt(el.NH.value, 10);
+
+    if (!(W > 0) || !(H > 0) || !(tOuter > 0) || !(tInner > 0)) {
+      showMessage('横幅・縦幅・材の幅をすべて正の数で入力してください');
+      diagramWrap.classList.remove('show');
+      resultEl.classList.remove('show');
+      return;
+    }
+    if (!(nW >= 0) || !(nH >= 0)) {
+      showMessage('本数は0以上の整数で入力してください');
+      return;
+    }
+
+    let axisW, axisH;
+    try {
+      axisW = computeAxis(W, tOuter, tInner, nW);
+      axisH = computeAxis(H, tOuter, tInner, nH);
+    } catch (e) {
+      showMessage(e.message);
+      diagramWrap.classList.remove('show');
+      resultEl.classList.remove('show');
+      return;
+    }
+
+    showMessage('');
+    drawDiagram(W, H, tOuter, tInner, axisW, axisH);
+    fillResults(tOuter, axisW, axisH);
+    diagramWrap.classList.add('show');
+    resultEl.classList.add('show');
+  }
+
+  function drawDiagram(W, H, tOuter, tInner, axisW, axisH) {
+    // Reserve extra room for a dimension line (tick marks + numbers) only on
+    // the sides that actually have posts to label, so the diagram stays
+    // compact when there's nothing extra to show.
+    const padTop = 46;
+    const padBottom = axisW.posts.length > 0 ? 44 : 20;
+    const padLeft = axisH.posts.length > 0 ? 76 : 46;
+    const padRight = 20;
+    const availW = VBW - padLeft - padRight, availH = VBH - padTop - padBottom;
+    const scale = Math.min(availW / W, availH / H);
+    const drawW = W * scale, drawH = H * scale;
+    const offX = padLeft + (availW - drawW) / 2;
+    const offY = padTop + (availH - drawH) / 2;
+    const tOs = tOuter * scale;
+    const tIs = tInner * scale;
+
+    function rect(x, y, w, h, fill, stroke) {
+      return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${stroke || 'none'}" stroke-width="1"/>`;
+    }
+
+    let html = '';
+    // outer frame ring (evenodd fill between outer rect and inner rect)
+    html += `<path d="M${offX},${offY} h${drawW} v${drawH} h${-drawW} Z M${offX + tOs},${offY + tOs} h${drawW - 2 * tOs} v${drawH - 2 * tOs} h${-(drawW - 2 * tOs)} Z" fill="var(--frame)" stroke="var(--frame-line)" stroke-width="1.5" fill-rule="evenodd"/>`;
+
+    // vertical studs (width direction)
+    for (const p of axisW.posts) {
+      const x = offX + p.leftAbs * scale;
+      html += rect(x, offY + tOs, tIs, drawH - 2 * tOs, 'var(--frame)', 'var(--frame-line)');
+    }
+    // horizontal rails (height direction) - measured from bottom, svg y grows downward
+    for (const p of axisH.posts) {
+      const yFromBottom = p.leftAbs * scale;
+      const y = offY + drawH - tOs - yFromBottom;
+      html += rect(offX + tOs, y, drawW - 2 * tOs, tIs, 'var(--frame)', 'var(--frame-line)');
+    }
+
+    // outer border outline for clarity
+    html += `<rect x="${offX}" y="${offY}" width="${drawW}" height="${drawH}" fill="none" stroke="var(--frame-line)" stroke-width="1.5"/>`;
+
+    // dimension labels
+    html += `<text x="${offX + drawW / 2}" y="${offY - 14}" font-size="13" text-anchor="middle" fill="var(--text)" font-weight="700">W = ${fmt(W)}</text>`;
+    html += `<text x="${offX - (axisH.posts.length > 0 ? 58 : 14)}" y="${offY + drawH / 2}" font-size="13" text-anchor="middle" fill="var(--text)" font-weight="700" transform="rotate(-90 ${offX - (axisH.posts.length > 0 ? 58 : 14)} ${offY + drawH / 2})">H = ${fmt(H)}</text>`;
+
+    // horizontal dimension line below the frame: each stud's edge positions
+    if (axisW.posts.length > 0) {
+      const pts = [];
+      axisW.posts.forEach(p => { pts.push(p.leftAbs); pts.push(p.rightAbs); });
+      pts.sort((a, b) => a - b);
+      const yTick = offY + drawH + 8;
+      pts.forEach((pos, idx) => {
+        const x = offX + pos * scale;
+        const ly = idx % 2 === 0 ? yTick + 12 : yTick + 24;
+        html += `<line x1="${x}" y1="${yTick}" x2="${x}" y2="${ly - 8}" stroke="var(--muted)" stroke-width="1"/>`;
+        html += `<text x="${x}" y="${ly}" font-size="10" text-anchor="middle" fill="var(--muted)">${fmt(pos)}</text>`;
+      });
+    }
+
+    // vertical dimension line left of the frame: each rail's edge positions
+    if (axisH.posts.length > 0) {
+      const pts = [];
+      axisH.posts.forEach(p => { pts.push(p.leftAbs); pts.push(p.rightAbs); });
+      pts.sort((a, b) => a - b);
+      const xTick = offX - 8;
+      pts.forEach((pos, idx) => {
+        const y = offY + drawH - pos * scale;
+        const lx = idx % 2 === 0 ? xTick - 10 : xTick - 24;
+        html += `<line x1="${xTick}" y1="${y}" x2="${lx + 8}" y2="${y}" stroke="var(--muted)" stroke-width="1"/>`;
+        html += `<text x="${lx}" y="${y + 3}" font-size="10" text-anchor="middle" fill="var(--muted)">${fmt(pos)}</text>`;
+      });
+    }
+
+    svg.innerHTML = html;
+  }
+
+  function fillResults(tOuter, axisW, axisH) {
+    document.getElementById('sInnerW').textContent = fmt(axisW.inner);
+    document.getElementById('sInnerH').textContent = fmt(axisH.inner);
+
+    widthBlock.style.display = axisW.posts.length > 0 ? '' : 'none';
+    heightBlock.style.display = axisH.posts.length > 0 ? '' : 'none';
+
+    document.getElementById('sPitchW').textContent = axisW.pitch != null ? fmt(axisW.pitch) : '-';
+    document.getElementById('sPitchH').textContent = axisH.pitch != null ? fmt(axisH.pitch) : '-';
+    document.getElementById('sStudLenW').textContent = fmt(axisH.inner);
+    document.getElementById('sStudLenH').textContent = fmt(axisW.inner);
+
+    const tbodyW = document.querySelector('#tableW tbody');
+    tbodyW.innerHTML = axisW.posts.map(p =>
+      `<tr><td>${p.index}本目</td><td>${fmt(tOuter + p.centerRel)}</td><td>${fmt(p.leftAbs)}</td><td>${fmt(p.rightAbs)}</td></tr>`
+    ).join('');
+
+    const tbodyH = document.querySelector('#tableH tbody');
+    tbodyH.innerHTML = axisH.posts.map(p =>
+      `<tr><td>${p.index}本目</td><td>${fmt(tOuter + p.centerRel)}</td><td>${fmt(p.leftAbs)}</td><td>${fmt(p.rightAbs)}</td></tr>`
+    ).join('');
+  }
+
+  function reset() {
+    Object.values(el).forEach(inp => inp.value = '');
+    showMessage('');
+    diagramWrap.classList.remove('show');
+    resultEl.classList.remove('show');
+  }
+
+  calcBtn.addEventListener('click', calculate);
+  resetBtn.addEventListener('click', reset);
+  Object.values(el).forEach(inp => {
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        calculate();
+      }
+    });
+  });
+
+  // --- Welding pitch calculator ---
+  // Convention differs from the stud layout above: the first weld sits flush
+  // against the start margin and the last weld sits flush against the end
+  // margin, with (n-1) equal pitches between weld start positions.
+  const wEl = {
+    L: document.getElementById('wL'),
+    E: document.getElementById('wE'),
+    W: document.getElementById('wW'),
+    N: document.getElementById('wN')
+  };
+  const weldCalcBtn = document.getElementById('weldCalcBtn');
+  const weldResetBtn = document.getElementById('weldResetBtn');
+  const weldMessageEl = document.getElementById('weldMessage');
+  const weldDiagramWrap = document.getElementById('weldDiagramWrap');
+  const weldSvg = document.getElementById('weldSvg');
+  const weldResultEl = document.getElementById('weldResult');
+  const WVBW = 480, WVBH = 150;
+
+  function showWeldMessage(text) {
+    weldMessageEl.textContent = text;
+    weldMessageEl.className = 'message' + (text ? ' error' : '');
+  }
+
+  function computeWelds(L, e, w, n) {
+    const effective = L - 2 * e;
+    if (effective <= 0) throw new Error('余白に対して全体の長さが小さすぎます');
+    if (w > effective) throw new Error('溶接幅が有効長さより大きいです');
+    let pitch = null;
+    const welds = [];
+    if (n === 1) {
+      welds.push({ index: 1, start: e, end: e + w });
+    } else {
+      pitch = (effective - w) / (n - 1);
+      if (pitch < w) throw new Error('箇所数が多すぎて溶接同士が重なります');
+      for (let i = 1; i <= n; i++) {
+        const start = e + pitch * (i - 1);
+        welds.push({ index: i, start, end: start + w });
+      }
+    }
+    return { effective, pitch, welds };
+  }
+
+  function weldCalculate() {
+    const L = parseFloat(wEl.L.value);
+    const e = parseFloat(wEl.E.value);
+    const w = parseFloat(wEl.W.value);
+    const n = wEl.N.value === '' ? 0 : parseInt(wEl.N.value, 10);
+
+    if (!(L > 0) || !(e >= 0) || !(w > 0)) {
+      showWeldMessage('長さ・溶接幅を正の数で、余白を0以上で入力してください');
+      weldDiagramWrap.classList.remove('show');
+      weldResultEl.classList.remove('show');
+      return;
+    }
+    if (!(n >= 1)) {
+      showWeldMessage('溶接箇所数は1以上の整数で入力してください');
+      return;
+    }
+
+    let res;
+    try {
+      res = computeWelds(L, e, w, n);
+    } catch (err) {
+      showWeldMessage(err.message);
+      weldDiagramWrap.classList.remove('show');
+      weldResultEl.classList.remove('show');
+      return;
+    }
+
+    showWeldMessage('');
+    drawWeldDiagram(L, e, res);
+    fillWeldResults(res);
+    weldDiagramWrap.classList.add('show');
+    weldResultEl.classList.add('show');
+  }
+
+  function drawWeldDiagram(L, e, res) {
+    const pad = 40;
+    const barY = 60, barH = 40;
+    const availW = WVBW - pad * 2;
+    const scale = availW / L;
+    const x0 = pad;
+
+    let html = '';
+    html += `<rect x="${x0}" y="${barY}" width="${L * scale}" height="${barH}" fill="none" stroke="var(--frame-line)" stroke-width="1.5"/>`;
+    if (e > 0) {
+      html += `<rect x="${x0}" y="${barY}" width="${e * scale}" height="${barH}" fill="var(--bg)"/>`;
+      html += `<rect x="${x0 + (L - e) * scale}" y="${barY}" width="${e * scale}" height="${barH}" fill="var(--bg)"/>`;
+    }
+    for (const wd of res.welds) {
+      const x = x0 + wd.start * scale;
+      const wpx = (wd.end - wd.start) * scale;
+      html += `<rect x="${x}" y="${barY}" width="${wpx}" height="${barH}" fill="var(--frame)" stroke="var(--frame-line)" stroke-width="1"/>`;
+    }
+    html += `<text x="${x0 + L * scale / 2}" y="${barY - 14}" font-size="13" text-anchor="middle" fill="var(--text)" font-weight="700">L = ${fmt(L)}</text>`;
+
+    // dimension line below the bar: each weld's start/end position
+    const pts = [];
+    res.welds.forEach(wd => { pts.push(wd.start); pts.push(wd.end); });
+    pts.sort((a, b) => a - b);
+    const yTick = barY + barH + 8;
+    pts.forEach((pos, idx) => {
+      const x = x0 + pos * scale;
+      const ly = idx % 2 === 0 ? yTick + 12 : yTick + 24;
+      html += `<line x1="${x}" y1="${yTick}" x2="${x}" y2="${ly - 8}" stroke="var(--muted)" stroke-width="1"/>`;
+      html += `<text x="${x}" y="${ly}" font-size="10" text-anchor="middle" fill="var(--muted)">${fmt(pos)}</text>`;
+    });
+
+    weldSvg.innerHTML = html;
+  }
+
+  function fillWeldResults(res) {
+    document.getElementById('wInner').textContent = fmt(res.effective);
+    document.getElementById('wPitch').textContent = res.pitch != null ? fmt(res.pitch) : '-';
+    const tbody = document.querySelector('#weldTable tbody');
+    tbody.innerHTML = res.welds.map(wd =>
+      `<tr><td>${wd.index}か所目</td><td>${fmt(wd.start)}</td><td>${fmt(wd.end)}</td></tr>`
+    ).join('');
+  }
+
+  function weldReset() {
+    Object.values(wEl).forEach(inp => inp.value = '');
+    showWeldMessage('');
+    weldDiagramWrap.classList.remove('show');
+    weldResultEl.classList.remove('show');
+  }
+
+  weldCalcBtn.addEventListener('click', weldCalculate);
+  weldResetBtn.addEventListener('click', weldReset);
+  Object.values(wEl).forEach(inp => {
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        weldCalculate();
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>

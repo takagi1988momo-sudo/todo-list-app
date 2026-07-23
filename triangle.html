@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>三角形計算機</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card-bg: #ffffff;
+    --text: #1f2430;
+    --muted: #8a8f9c;
+    --accent: #4f6df5;
+    --accent-hover: #3d59db;
+    --border: #e5e7eb;
+    --danger: #e5533d;
+    --line: #4f6df5;
+    --fill: rgba(79, 109, 245, 0.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 40px 16px;
+    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    color: var(--text);
+  }
+  .app {
+    width: 100%;
+    max-width: 560px;
+  }
+  .top-nav {
+    margin-bottom: 12px;
+  }
+  .top-nav a {
+    color: var(--muted);
+    font-size: 14px;
+    text-decoration: none;
+  }
+  .top-nav a:hover {
+    color: var(--accent);
+  }
+  h1 {
+    font-size: 24px;
+    margin: 0 0 4px;
+    font-weight: 700;
+  }
+  p.desc {
+    margin: 0 0 20px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.04);
+  }
+  .diagram-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 480 / 380;
+    margin-bottom: 16px;
+  }
+  .diagram-wrap svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .field {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .field label {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .field input {
+    width: 64px;
+    padding: 5px 4px;
+    text-align: center;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    background: white;
+    transition: border-color 0.15s;
+  }
+  .field input:focus {
+    border-color: var(--accent);
+  }
+  .field.computed input {
+    color: var(--accent);
+    font-weight: 700;
+    border-color: var(--accent);
+    background: #eef1fe;
+  }
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .actions button {
+    flex: 1;
+    padding: 12px 0;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #calcBtn {
+    background: var(--accent);
+    color: white;
+  }
+  #calcBtn:hover {
+    background: var(--accent-hover);
+  }
+  #resetBtn {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border) !important;
+  }
+  #resetBtn:hover {
+    color: var(--danger);
+    border-color: var(--danger) !important;
+  }
+  .message {
+    font-size: 14px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    margin-bottom: 14px;
+    display: none;
+  }
+  .message.error {
+    display: block;
+    background: #fdecea;
+    color: var(--danger);
+  }
+  .message.info {
+    display: block;
+    background: #eef1fe;
+    color: var(--accent-hover);
+  }
+  .result {
+    display: none;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+  .result.show {
+    display: block;
+  }
+  .result-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .result-grid .box {
+    background: var(--bg);
+    border-radius: 10px;
+    padding: 8px 4px;
+    text-align: center;
+  }
+  .result-grid .box .k {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .result-grid .box .v {
+    font-size: 16px;
+    font-weight: 700;
+    margin-top: 2px;
+  }
+  .area-line {
+    font-size: 14px;
+    color: var(--text);
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="top-nav"><a href="tools.html">← 図形計算サイト</a> <a href="framing.html">🪵 枠割り付け計算</a></div>
+    <h1>🔺 三角形計算機</h1>
+    <p class="desc">辺・角度のうち3つ(辺を1つ以上含む)を入力すると、図形がその形になり残りの値を計算します。</p>
+    <div class="card">
+      <div class="diagram-wrap" id="diagramWrap">
+        <svg id="svg" viewBox="0 0 480 380">
+          <polygon id="tri" points="" fill="var(--fill)" stroke="var(--line)" stroke-width="2.5" stroke-linejoin="round"/>
+          <circle id="vA" r="3" fill="var(--line)"/>
+          <circle id="vB" r="3" fill="var(--line)"/>
+          <circle id="vC" r="3" fill="var(--line)"/>
+          <text id="tA" font-size="13" fill="var(--text)" font-weight="700" text-anchor="middle" stroke="white" stroke-width="4" paint-order="stroke"></text>
+          <text id="tB" font-size="13" fill="var(--text)" font-weight="700" text-anchor="middle" stroke="white" stroke-width="4" paint-order="stroke"></text>
+          <text id="tC" font-size="13" fill="var(--text)" font-weight="700" text-anchor="middle" stroke="white" stroke-width="4" paint-order="stroke"></text>
+        </svg>
+        <div class="field" id="fa"><label>辺 a</label><input type="number" step="any" id="ia" placeholder="-"></div>
+        <div class="field" id="fb"><label>辺 b</label><input type="number" step="any" id="ib" placeholder="-"></div>
+        <div class="field" id="fc"><label>辺 c</label><input type="number" step="any" id="ic" placeholder="-"></div>
+        <div class="field" id="fA"><label>角 A(°)</label><input type="number" step="any" id="iA" placeholder="-"></div>
+        <div class="field" id="fB"><label>角 B(°)</label><input type="number" step="any" id="iB" placeholder="-"></div>
+        <div class="field" id="fC"><label>角 C(°)</label><input type="number" step="any" id="iC" placeholder="-"></div>
+      </div>
+      <div class="actions">
+        <button id="calcBtn">計算する</button>
+        <button id="resetBtn">リセット</button>
+      </div>
+      <div class="message" id="message"></div>
+      <div class="result" id="result">
+        <div class="result-grid">
+          <div class="box"><div class="k">辺 a</div><div class="v" id="ra"></div></div>
+          <div class="box"><div class="k">辺 b</div><div class="v" id="rb"></div></div>
+          <div class="box"><div class="k">辺 c</div><div class="v" id="rc"></div></div>
+          <div class="box"><div class="k">角 A</div><div class="v" id="rA"></div></div>
+          <div class="box"><div class="k">角 B</div><div class="v" id="rB"></div></div>
+          <div class="box"><div class="k">角 C</div><div class="v" id="rC"></div></div>
+        </div>
+        <div class="area-line">面積: <strong id="rArea"></strong></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  const VBW = 480, VBH = 380;
+
+  // Template (initial) vertex positions, math space (y-up), used before any calculation.
+  const TEMPLATE = {
+    A: { x: 90,  y: 0 },
+    B: { x: 390, y: 0 },
+    C: { x: 240, y: 240 }
+  };
+
+  const inputs = {
+    a: document.getElementById('ia'),
+    b: document.getElementById('ib'),
+    c: document.getElementById('ic'),
+    A: document.getElementById('iA'),
+    B: document.getElementById('iB'),
+    C: document.getElementById('iC')
+  };
+  const fields = {
+    a: document.getElementById('fa'), b: document.getElementById('fb'), c: document.getElementById('fc'),
+    A: document.getElementById('fA'), B: document.getElementById('fB'), C: document.getElementById('fC')
+  };
+  const triEl = document.getElementById('tri');
+  const dotEls = { A: document.getElementById('vA'), B: document.getElementById('vB'), C: document.getElementById('vC') };
+  const labelEls = { A: document.getElementById('tA'), B: document.getElementById('tB'), C: document.getElementById('tC') };
+  const messageEl = document.getElementById('message');
+  const resultEl = document.getElementById('result');
+  const calcBtn = document.getElementById('calcBtn');
+  const resetBtn = document.getElementById('resetBtn');
+
+  function toRad(d) { return d * Math.PI / 180; }
+  function toDeg(r) { return r * 180 / Math.PI; }
+  function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
+  function fmt(n) {
+    return Math.round(n * 100) / 100;
+  }
+
+  function solveTriangle(input) {
+    const known = { a: input.a, b: input.b, c: input.c, A: input.A, B: input.B, C: input.C };
+    const sidesKnown = ['a', 'b', 'c'].filter(k => known[k] != null);
+    const anglesKnown = ['A', 'B', 'C'].filter(k => known[k] != null);
+    const nS = sidesKnown.length, nA = anglesKnown.length;
+
+    if (nS + nA !== 3) {
+      throw new Error('ちょうど3つの値を入力してください(現在 ' + (nS + nA) + '個)');
+    }
+    if (nS === 0) {
+      throw new Error('角度だけでは大きさが決まりません。辺の長さを1つ以上入力してください');
+    }
+    for (const k of sidesKnown) {
+      if (!(known[k] > 0)) throw new Error('辺の長さは正の数で入力してください');
+    }
+    for (const k of anglesKnown) {
+      if (!(known[k] > 0 && known[k] < 180)) throw new Error('角度は0°〜180°の範囲で入力してください');
+    }
+
+    const oppositeOfAngle = { A: 'a', B: 'b', C: 'c' };
+    const angleOfSide = { a: 'A', b: 'B', c: 'C' };
+    let ambiguous = false;
+
+    if (nS === 3) {
+      const { a, b, c } = known;
+      if (a + b <= c || b + c <= a || c + a <= b) {
+        throw new Error('その3辺の長さでは三角形を作れません');
+      }
+      known.A = toDeg(Math.acos(clamp((b * b + c * c - a * a) / (2 * b * c), -1, 1)));
+      known.B = toDeg(Math.acos(clamp((a * a + c * c - b * b) / (2 * a * c), -1, 1)));
+      known.C = 180 - known.A - known.B;
+
+    } else if (nS === 2 && nA === 1) {
+      const angleKey = anglesKnown[0];
+      const missingSide = ['a', 'b', 'c'].find(s => !sidesKnown.includes(s));
+
+      if (oppositeOfAngle[angleKey] === missingSide) {
+        // SAS: known angle is between the two known sides
+        const s1 = known[sidesKnown[0]], s2 = known[sidesKnown[1]];
+        known[missingSide] = Math.sqrt(s1 * s1 + s2 * s2 - 2 * s1 * s2 * Math.cos(toRad(known[angleKey])));
+        const { a, b, c } = known;
+        known.A = toDeg(Math.acos(clamp((b * b + c * c - a * a) / (2 * b * c), -1, 1)));
+        known.B = toDeg(Math.acos(clamp((a * a + c * c - b * b) / (2 * a * c), -1, 1)));
+        known.C = 180 - known.A - known.B;
+      } else {
+        // SSA: the known side opposite the known angle -> ambiguous case
+        const oppSide = oppositeOfAngle[angleKey];
+        const otherSide = sidesKnown.find(s => s !== oppSide);
+        const otherAngleKey = angleOfSide[otherSide];
+        const ratio = known[otherSide] * Math.sin(toRad(known[angleKey])) / known[oppSide];
+        if (ratio > 1.0000001) {
+          throw new Error('その条件を満たす三角形は存在しません');
+        }
+        const base = toDeg(Math.asin(clamp(ratio, -1, 1)));
+        const candidates = [base, 180 - base].filter(cand => cand > 0 && known[angleKey] + cand < 180 - 1e-6);
+        if (candidates.length === 0) {
+          throw new Error('その条件を満たす三角形は存在しません');
+        }
+        if (candidates.length === 2 && Math.abs(candidates[0] - candidates[1]) > 1e-6) {
+          ambiguous = true;
+        }
+        known[otherAngleKey] = candidates[0];
+        const thirdAngleKey = ['A', 'B', 'C'].find(k => k !== angleKey && k !== otherAngleKey);
+        known[thirdAngleKey] = 180 - known[angleKey] - known[otherAngleKey];
+        const k = known[oppSide] / Math.sin(toRad(known[angleKey]));
+        known[missingSide] = k * Math.sin(toRad(known[angleOfSide[missingSide]]));
+      }
+
+    } else if (nS === 1 && nA === 2) {
+      const missingAngleKey = ['A', 'B', 'C'].find(k => !anglesKnown.includes(k));
+      known[missingAngleKey] = 180 - known[anglesKnown[0]] - known[anglesKnown[1]];
+      if (known[missingAngleKey] <= 0) {
+        throw new Error('角度の合計が180°を超えています');
+      }
+      const sideKey = sidesKnown[0];
+      const k = known[sideKey] / Math.sin(toRad(known[angleOfSide[sideKey]]));
+      for (const s of ['a', 'b', 'c']) {
+        if (known[s] == null) known[s] = k * Math.sin(toRad(known[angleOfSide[s]]));
+      }
+    }
+
+    return { a: known.a, b: known.b, c: known.c, A: known.A, B: known.B, C: known.C, ambiguous };
+  }
+
+  function transformPoints(mathA, mathB, mathC) {
+    const pts = [mathA, mathB, mathC];
+    const minX = Math.min(...pts.map(p => p.x));
+    const maxX = Math.max(...pts.map(p => p.x));
+    const minY = Math.min(...pts.map(p => p.y));
+    const maxY = Math.max(...pts.map(p => p.y));
+    const w = Math.max(maxX - minX, 1e-6);
+    const h = Math.max(maxY - minY, 1e-6);
+    const padX = 90, padY = 70;
+    const availW = VBW - padX * 2, availH = VBH - padY * 2;
+    const scale = Math.min(availW / w, availH / h);
+    const scaledW = w * scale, scaledH = h * scale;
+    const offX = (VBW - scaledW) / 2 - minX * scale;
+    const offY = (VBH - scaledH) / 2 - minY * scale;
+    function toSvg(p) {
+      const x = p.x * scale + offX;
+      const yUp = p.y * scale + offY;
+      const y = VBH - yUp;
+      return { x, y };
+    }
+    return { A: toSvg(mathA), B: toSvg(mathB), C: toSvg(mathC) };
+  }
+
+  function renderDiagram(svgA, svgB, svgC, values) {
+    triEl.setAttribute('points', `${svgA.x},${svgA.y} ${svgB.x},${svgB.y} ${svgC.x},${svgC.y}`);
+    dotEls.A.setAttribute('cx', svgA.x); dotEls.A.setAttribute('cy', svgA.y);
+    dotEls.B.setAttribute('cx', svgB.x); dotEls.B.setAttribute('cy', svgB.y);
+    dotEls.C.setAttribute('cx', svgC.x); dotEls.C.setAttribute('cy', svgC.y);
+
+    const centroid = {
+      x: (svgA.x + svgB.x + svgC.x) / 3,
+      y: (svgA.y + svgB.y + svgC.y) / 3
+    };
+
+    // Move a fixed pixel distance along the line toward/away from the centroid,
+    // rather than a fraction of it, so narrow angles still get enough clearance
+    // from both edges (a proportional offset collapses to nothing for narrow angles).
+    function towardCentroid(p, px) {
+      const dx = centroid.x - p.x, dy = centroid.y - p.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      const d = Math.min(px, dist * 0.55);
+      return { x: p.x + (dx / dist) * d, y: p.y + (dy / dist) * d };
+    }
+    function awayFromCentroid(p, px) {
+      const dx = p.x - centroid.x, dy = p.y - centroid.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      return { x: p.x + (dx / dist) * px, y: p.y + (dy / dist) * px };
+    }
+
+    // vertex name labels, placed just outside each vertex
+    const vertexLabelPos = { A: awayFromCentroid(svgA, 16), B: awayFromCentroid(svgB, 16), C: awayFromCentroid(svgC, 16) };
+    labelEls.A.setAttribute('x', vertexLabelPos.A.x); labelEls.A.setAttribute('y', vertexLabelPos.A.y); labelEls.A.textContent = 'A';
+    labelEls.B.setAttribute('x', vertexLabelPos.B.x); labelEls.B.setAttribute('y', vertexLabelPos.B.y); labelEls.B.textContent = 'B';
+    labelEls.C.setAttribute('x', vertexLabelPos.C.x); labelEls.C.setAttribute('y', vertexLabelPos.C.y); labelEls.C.textContent = 'C';
+
+    // angle input fields, pulled well inside each vertex so they clear both edges
+    placeField('A', towardCentroid(svgA, 46));
+    placeField('B', towardCentroid(svgB, 46));
+    placeField('C', towardCentroid(svgC, 46));
+
+    // side input fields, placed at midpoints, pushed outward clear of the edge
+    const midBC = { x: (svgB.x + svgC.x) / 2, y: (svgB.y + svgC.y) / 2 };
+    const midCA = { x: (svgC.x + svgA.x) / 2, y: (svgC.y + svgA.y) / 2 };
+    const midAB = { x: (svgA.x + svgB.x) / 2, y: (svgA.y + svgB.y) / 2 };
+    placeField('a', awayFromCentroid(midBC, 30));
+    placeField('b', awayFromCentroid(midCA, 30));
+    placeField('c', awayFromCentroid(midAB, 30));
+  }
+
+  function placeField(key, pos) {
+    const el = fields[key];
+    el.style.left = (pos.x / VBW * 100) + '%';
+    el.style.top = (pos.y / VBH * 100) + '%';
+  }
+
+  function layoutTemplate() {
+    const t = transformPoints(TEMPLATE.A, TEMPLATE.B, TEMPLATE.C);
+    renderDiagram(t.A, t.B, t.C);
+  }
+
+  function readInputs() {
+    const out = {};
+    for (const k of Object.keys(inputs)) {
+      const v = inputs[k].value.trim();
+      out[k] = v === '' ? null : parseFloat(v);
+    }
+    return out;
+  }
+
+  function showMessage(text, type) {
+    messageEl.textContent = text;
+    messageEl.className = 'message ' + (type || '');
+    if (!text) messageEl.className = 'message';
+  }
+
+  function markComputed(known, result) {
+    for (const k of Object.keys(fields)) {
+      const wasKnown = known[k] != null;
+      fields[k].classList.toggle('computed', !wasKnown);
+      if (!wasKnown) inputs[k].value = fmt(result[k]);
+    }
+  }
+
+  function calculate() {
+    const known = readInputs();
+    let result;
+    try {
+      result = solveTriangle(known);
+    } catch (e) {
+      showMessage(e.message, 'error');
+      resultEl.classList.remove('show');
+      return;
+    }
+
+    const mathA = { x: 0, y: 0 };
+    const mathB = { x: result.c, y: 0 };
+    const mathC = { x: result.b * Math.cos(toRad(result.A)), y: result.b * Math.sin(toRad(result.A)) };
+    const svg = transformPoints(mathA, mathB, mathC);
+    renderDiagram(svg.A, svg.B, svg.C, result);
+    markComputed(known, result);
+
+    document.getElementById('ra').textContent = fmt(result.a);
+    document.getElementById('rb').textContent = fmt(result.b);
+    document.getElementById('rc').textContent = fmt(result.c);
+    document.getElementById('rA').textContent = fmt(result.A) + '°';
+    document.getElementById('rB').textContent = fmt(result.B) + '°';
+    document.getElementById('rC').textContent = fmt(result.C) + '°';
+    const s = (result.a + result.b + result.c) / 2;
+    const area = Math.sqrt(Math.max(s * (s - result.a) * (s - result.b) * (s - result.c), 0));
+    document.getElementById('rArea').textContent = fmt(area);
+    resultEl.classList.add('show');
+
+    if (result.ambiguous) {
+      showMessage('この入力条件では三角形が2通り考えられます(2つ目の解は表示していません)', 'info');
+    } else {
+      showMessage('', '');
+    }
+  }
+
+  function reset() {
+    for (const k of Object.keys(inputs)) {
+      inputs[k].value = '';
+      fields[k].classList.remove('computed');
+    }
+    showMessage('', '');
+    resultEl.classList.remove('show');
+    layoutTemplate();
+  }
+
+  calcBtn.addEventListener('click', calculate);
+  resetBtn.addEventListener('click', reset);
+  Object.values(inputs).forEach(inp => {
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        calculate();
+      }
+    });
+    inp.addEventListener('input', () => {
+      inp.parentElement.classList.remove('computed');
+    });
+  });
+
+  layoutTemplate();
+})();
+</script>
+</body>
+</html>
