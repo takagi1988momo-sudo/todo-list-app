@@ -417,13 +417,13 @@
     const db = await openDB();
     return reqPromise(db.transaction('entries', 'readonly').objectStore('entries').getAll());
   }
-  async function deleteEntryDB(id) {
-    const db = await openDB();
-    return reqPromise(db.transaction('entries', 'readwrite').objectStore('entries').delete(id));
-  }
   async function addPhoto(photo) {
     const db = await openDB();
     return reqPromise(db.transaction('photos', 'readwrite').objectStore('photos').add(photo));
+  }
+  async function putPhoto(photo) {
+    const db = await openDB();
+    return reqPromise(db.transaction('photos', 'readwrite').objectStore('photos').put(photo));
   }
   async function listPhotosForEntry(entryId) {
     const db = await openDB();
@@ -605,6 +605,31 @@
     return res.json();
   }
 
+  async function listFilesInFolder(folderId) {
+    const query = `'${folderId}' in parents and trashed=false`;
+    const res = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`, { method: 'GET' });
+    return res.files || [];
+  }
+
+  async function driveDeleteFile(fileId) {
+    try {
+      await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${driveAccessToken}` }
+      });
+    } catch (e) {
+      // best-effort; ignore failures
+    }
+  }
+
+  async function downloadDriveFile(fileId) {
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+      headers: { Authorization: `Bearer ${driveAccessToken}` }
+    });
+    if (!res.ok) throw new Error(`Drive download error ${res.status}`);
+    return res.blob();
+  }
+
   async function findFileInFolder(name, folderId) {
     const query = `name='${name.replace(/'/g, "\\'")}' and '${folderId}' in parents and trashed=false`;
     const res = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`, { method: 'GET' });
@@ -625,7 +650,8 @@
       memo: e.memo || '',
       year: e.year,
       createdAt: e.createdAt,
-      updatedAt: e.updatedAt || e.createdAt
+      updatedAt: e.updatedAt || e.createdAt,
+      deleted: !!e.deleted
     }));
     const rootFolderId = await findOrCreateFolder('写真保存ツール');
     const existing = await findFileInFolder(INDEX_FILE_NAME, rootFolderId);
@@ -661,6 +687,15 @@
     const remoteEntries = await res.json();
     for (const re of remoteEntries) {
       const local = await getEntry(re.id);
+      if (re.deleted) {
+        if (local && !local.deleted) {
+          local.deleted = true;
+          local.updatedAt = re.updatedAt;
+          await putEntry(local);
+          await deletePhotosForEntry(re.id);
+        }
+        continue;
+      }
       if (!local) {
         await addEntry({
           id: re.id,
@@ -671,9 +706,10 @@
           year: re.year,
           createdAt: re.createdAt,
           updatedAt: re.updatedAt,
-          photoCount: 0
+          photoCount: 0,
+          deleted: false
         });
-      } else if ((re.updatedAt || '') > (local.updatedAt || local.createdAt || '')) {
+      } else if (!local.deleted && (re.updatedAt || '') > (local.updatedAt || local.createdAt || '')) {
         local.company = re.company;
         local.model = re.model;
         local.order = re.order;
@@ -682,6 +718,57 @@
         await putEntry(local);
       }
     }
+  }
+
+  // ---- Photo sync (per-entry Drive folder mirrors local photos) ----
+  async function getEntryDriveFolderId(entry) {
+    const rootFolderId = await findOrCreateFolder('写真保存ツール');
+    const companyFolderId = await findOrCreateFolder(entry.company, rootFolderId);
+    return findOrCreateFolder(entry.id, companyFolderId);
+  }
+
+  async function uploadPhotoToDrive(photo, entry) {
+    const entryFolderId = await getEntryDriveFolderId(entry);
+    const result = await uploadFileToDrive(photo.blob, photo.name, entryFolderId);
+    return result.id;
+  }
+
+  async function pullPhotosForEntry(entry) {
+    if (!driveAccessToken) return false;
+    const entryFolderId = await getEntryDriveFolderId(entry);
+    const remoteFiles = await listFilesInFolder(entryFolderId);
+    const localPhotos = await listPhotosForEntry(entry.id);
+    const localByDriveId = new Map(localPhotos.filter(p => p.driveFileId).map(p => [p.driveFileId, p]));
+    let changed = false;
+
+    for (const rf of remoteFiles) {
+      if (!localByDriveId.has(rf.id)) {
+        try {
+          const blob = await downloadDriveFile(rf.id);
+          await addPhoto({
+            id: uid(),
+            entryId: entry.id,
+            name: rf.name,
+            type: blob.type,
+            blob,
+            createdAt: new Date().toISOString(),
+            driveFileId: rf.id
+          });
+          changed = true;
+        } catch (e) {
+          // skip this file, try others
+        }
+      }
+    }
+
+    const remoteIds = new Set(remoteFiles.map(f => f.id));
+    for (const lp of localPhotos) {
+      if (lp.driveFileId && !remoteIds.has(lp.driveFileId)) {
+        await deletePhotoDB(lp.id);
+        changed = true;
+      }
+    }
+    return changed;
   }
 
   async function syncWithDrive() {
@@ -703,7 +790,7 @@
 
   // ---- LIST VIEW ----
   async function renderList() {
-    const entries = await listEntries();
+    const entries = (await listEntries()).filter(e => !e.deleted);
 
     const yearMap = new Map();
     entries.forEach(e => {
@@ -806,7 +893,8 @@
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
       photoCount: 0,
-      memo: ''
+      memo: '',
+      deleted: false
     };
     await addEntry(entry);
     await openDetail(entry.id);
@@ -823,6 +911,22 @@
     memoInput.value = currentEntry.memo || '';
     renderPhotoGrid();
     showView('detail');
+
+    if (driveAccessToken) {
+      statusMsg.textContent = '写真を同期中...';
+      try {
+        const changed = await pullPhotosForEntry(currentEntry);
+        if (changed && currentEntry) {
+          currentPhotos = await listPhotosForEntry(entryId);
+          currentEntry.photoCount = currentPhotos.length;
+          await putEntry(currentEntry);
+          renderPhotoGrid();
+        }
+      } catch (e) {
+        // sync failure is non-fatal
+      }
+      statusMsg.textContent = '';
+    }
   }
 
   memoInput.addEventListener('blur', async () => {
@@ -867,22 +971,38 @@
 
   async function addFiles(fileList) {
     const now = new Date();
+    const entryAtStart = currentEntry;
+    const newPhotos = [];
     for (const file of Array.from(fileList)) {
       if (!file.type.startsWith('image/')) continue;
       const photo = {
         id: uid(),
-        entryId: currentEntry.id,
+        entryId: entryAtStart.id,
         name: file.name,
         type: file.type,
         blob: file,
-        createdAt: now.toISOString()
+        createdAt: now.toISOString(),
+        driveFileId: null
       };
       await addPhoto(photo);
       currentPhotos.push(photo);
+      newPhotos.push(photo);
     }
     currentEntry.photoCount = currentPhotos.length;
     await putEntry(currentEntry);
     renderPhotoGrid();
+
+    if (driveAccessToken) {
+      for (const photo of newPhotos) {
+        try {
+          const driveFileId = await uploadPhotoToDrive(photo, entryAtStart);
+          photo.driveFileId = driveFileId;
+          await putPhoto(photo);
+        } catch (e) {
+          // upload failure is non-fatal; photo stays local-only
+        }
+      }
+    }
   }
 
   cameraBtn.addEventListener('click', () => cameraInput.click());
@@ -898,19 +1018,36 @@
   });
 
   async function removePhoto(id) {
+    const photo = currentPhotos.find(p => p.id === id);
     await deletePhotoDB(id);
     currentPhotos = currentPhotos.filter(p => p.id !== id);
     currentEntry.photoCount = currentPhotos.length;
     await putEntry(currentEntry);
     renderPhotoGrid();
+    if (photo && photo.driveFileId && driveAccessToken) {
+      driveDeleteFile(photo.driveFileId);
+    }
   }
 
   deleteEntryBtn.addEventListener('click', async () => {
-    if (!confirm(`「${currentEntry.company}」の記録と写真をすべて削除しますか？`)) return;
-    await deletePhotosForEntry(currentEntry.id);
-    await deleteEntryDB(currentEntry.id);
+    if (!confirm(`「${currentEntry.company}」の記録と写真をすべて削除しますか？\n（Googleドライブに接続している他の端末からも削除されます）`)) return;
+    const entryToDelete = currentEntry;
+    await deletePhotosForEntry(entryToDelete.id);
+    entryToDelete.deleted = true;
+    entryToDelete.updatedAt = new Date().toISOString();
+    await putEntry(entryToDelete);
     await renderList();
     showView('list');
+
+    if (driveAccessToken) {
+      try {
+        const entryFolderId = await getEntryDriveFolderId(entryToDelete);
+        await driveDeleteFile(entryFolderId);
+      } catch (e) {
+        // best-effort cleanup
+      }
+      pushEntriesToDrive();
+    }
   });
 
   // ---- Minimal ZIP writer (STORE method, no compression) ----
