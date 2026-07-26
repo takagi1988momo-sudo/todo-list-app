@@ -494,9 +494,12 @@
   let driveAccessToken = null;
   let driveTokenClient = null;
 
+  let driveRefreshTimer = null;
+
   function saveDriveToken(accessToken, expiresInSeconds) {
     const expiresAt = Date.now() + (expiresInSeconds * 1000);
     localStorage.setItem(DRIVE_TOKEN_STORAGE_KEY, JSON.stringify({ accessToken, expiresAt }));
+    return expiresAt;
   }
 
   function loadDriveToken() {
@@ -505,7 +508,7 @@
       if (!raw) return null;
       const { accessToken, expiresAt } = JSON.parse(raw);
       if (!accessToken || !expiresAt || Date.now() >= expiresAt) return null;
-      return accessToken;
+      return { accessToken, expiresAt };
     } catch (e) {
       return null;
     }
@@ -517,6 +520,27 @@
     driveConnectBtn.textContent = connected ? '再接続' : '接続する';
   }
 
+  function disconnectDrive() {
+    driveAccessToken = null;
+    localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
+    if (driveRefreshTimer) { clearTimeout(driveRefreshTimer); driveRefreshTimer = null; }
+    setDriveConnected(false);
+  }
+
+  function isAuthError(err) {
+    return String(err && err.message || err).includes('401');
+  }
+
+  function scheduleDriveTokenRefresh(expiresAt) {
+    if (driveRefreshTimer) clearTimeout(driveRefreshTimer);
+    const REFRESH_MARGIN_MS = 5 * 60 * 1000;
+    const delay = Math.max(0, expiresAt - Date.now() - REFRESH_MARGIN_MS);
+    driveRefreshTimer = setTimeout(() => {
+      const client = ensureDriveTokenClient();
+      client.requestAccessToken({ prompt: '' });
+    }, delay);
+  }
+
   function ensureDriveTokenClient() {
     if (driveTokenClient) return driveTokenClient;
     driveTokenClient = google.accounts.oauth2.initTokenClient({
@@ -525,8 +549,9 @@
       callback: (tokenResponse) => {
         if (tokenResponse && tokenResponse.access_token) {
           driveAccessToken = tokenResponse.access_token;
-          saveDriveToken(tokenResponse.access_token, Number(tokenResponse.expires_in || 3600));
+          const expiresAt = saveDriveToken(tokenResponse.access_token, Number(tokenResponse.expires_in || 3600));
           setDriveConnected(true);
+          scheduleDriveTokenRefresh(expiresAt);
           syncWithDrive();
         }
       }
@@ -535,10 +560,11 @@
   }
 
   {
-    const savedToken = loadDriveToken();
-    if (savedToken) {
-      driveAccessToken = savedToken;
+    const saved = loadDriveToken();
+    if (saved) {
+      driveAccessToken = saved.accessToken;
       setDriveConnected(true);
+      scheduleDriveTokenRefresh(saved.expiresAt);
       syncWithDrive();
     }
   }
@@ -784,7 +810,12 @@
       await renderList();
       driveSyncMsg.textContent = '更新しました';
     } catch (err) {
-      driveSyncMsg.textContent = `更新に失敗しました: ${err.message || err}`;
+      if (isAuthError(err)) {
+        disconnectDrive();
+        driveSyncMsg.textContent = '接続が切れました。もう一度「接続する」を押してください';
+      } else {
+        driveSyncMsg.textContent = `更新に失敗しました: ${err.message || err}`;
+      }
     }
   }
 
@@ -928,10 +959,15 @@
           await putEntry(currentEntry);
           renderPhotoGrid();
         }
+        statusMsg.textContent = '';
       } catch (e) {
-        // sync failure is non-fatal
+        if (isAuthError(e)) {
+          disconnectDrive();
+          statusMsg.textContent = '接続が切れました。もう一度「接続する」を押してください';
+        } else {
+          statusMsg.textContent = '';
+        }
       }
-      statusMsg.textContent = '';
     }
   }
 
@@ -1224,10 +1260,8 @@
       await uploadFileToDrive(blob, `${base}.zip`, companyFolderId);
       statusMsg.textContent = 'Googleドライブに保存しました';
     } catch (err) {
-      if (String(err.message).includes('401')) {
-        driveAccessToken = null;
-        localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
-        setDriveConnected(false);
+      if (isAuthError(err)) {
+        disconnectDrive();
         statusMsg.textContent = '接続が切れました。もう一度「接続する」を押してください';
       } else {
         statusMsg.textContent = 'アップロードに失敗しました';
