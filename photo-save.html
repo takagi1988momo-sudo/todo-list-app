@@ -224,6 +224,7 @@
     height: 100%;
     object-fit: cover;
     display: block;
+    cursor: pointer;
   }
   .thumb .del {
     position: absolute;
@@ -303,6 +304,34 @@
     color: var(--accent);
     font-weight: 600;
   }
+  .photo-viewer {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 24px;
+  }
+  .photo-viewer img {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 8px;
+  }
+  .photo-viewer-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 44px;
+    height: 44px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+  }
 </style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -379,6 +408,11 @@
       </div>
       <button type="button" id="deleteEntryBtn" class="danger-link">この会社の記録を削除</button>
     </div>
+  </div>
+
+  <div class="photo-viewer" id="photoViewer" style="display:none;">
+    <button type="button" class="photo-viewer-close" id="photoViewerClose">✕</button>
+    <img id="photoViewerImg" alt="">
   </div>
 
 <script>
@@ -486,6 +520,9 @@
   const galleryInput = document.getElementById('galleryInput');
   const memoInput = document.getElementById('memoInput');
   const grid = document.getElementById('grid');
+  const photoViewer = document.getElementById('photoViewer');
+  const photoViewerImg = document.getElementById('photoViewerImg');
+  const photoViewerClose = document.getElementById('photoViewerClose');
   const photoEmptyMsg = document.getElementById('photoEmptyMsg');
   const countLabel = document.getElementById('countLabel');
   const downloadZipBtn = document.getElementById('downloadZipBtn');
@@ -1023,6 +1060,26 @@
     showView('list');
   });
 
+  let photoViewerUrl = null;
+
+  function openPhotoViewer(blob) {
+    if (photoViewerUrl) URL.revokeObjectURL(photoViewerUrl);
+    photoViewerUrl = URL.createObjectURL(blob);
+    photoViewerImg.src = photoViewerUrl;
+    photoViewer.style.display = 'flex';
+  }
+
+  function closePhotoViewer() {
+    photoViewer.style.display = 'none';
+    photoViewerImg.src = '';
+    if (photoViewerUrl) { URL.revokeObjectURL(photoViewerUrl); photoViewerUrl = null; }
+  }
+
+  photoViewerClose.addEventListener('click', closePhotoViewer);
+  photoViewer.addEventListener('click', (e) => {
+    if (e.target === photoViewer) closePhotoViewer();
+  });
+
   function renderPhotoGrid() {
     grid.innerHTML = '';
     currentPhotos.forEach(p => {
@@ -1033,6 +1090,7 @@
       const url = URL.createObjectURL(p.blob);
       img.src = url;
       img.onload = () => URL.revokeObjectURL(url);
+      img.addEventListener('click', () => openPhotoViewer(p.blob));
       thumb.appendChild(img);
 
       const delBtn = document.createElement('button');
