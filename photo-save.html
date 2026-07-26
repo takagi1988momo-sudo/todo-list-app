@@ -578,6 +578,21 @@
     return driveTokenClient;
   }
 
+  function trySilentReconnect(retriesLeft) {
+    if (!window.google || !google.accounts || !google.accounts.oauth2) {
+      if (retriesLeft > 0) {
+        setTimeout(() => trySilentReconnect(retriesLeft - 1), 300);
+      }
+      return;
+    }
+    try {
+      const client = ensureDriveTokenClient();
+      client.requestAccessToken({ prompt: '' });
+    } catch (e) {
+      // silent attempt failed; user can still connect manually
+    }
+  }
+
   {
     const saved = loadDriveToken();
     if (saved) {
@@ -587,6 +602,7 @@
       syncWithDrive();
     } else {
       setDriveConnected(false);
+      trySilentReconnect(10);
     }
   }
 
