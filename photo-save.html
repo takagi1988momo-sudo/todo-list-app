@@ -200,6 +200,12 @@
     background: #eef1fe;
     border-color: var(--accent);
   }
+  .photo-buttons button:disabled {
+    color: var(--muted);
+    border-color: var(--border);
+    background: var(--bg);
+    cursor: not-allowed;
+  }
   .grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -312,6 +318,7 @@
       </div>
       <div class="status-msg" id="driveSyncMsg" style="margin-top:-8px;"></div>
       <button class="next-btn" id="newEntryBtn" type="button">＋ 新しい会社を登録</button>
+      <div class="required-hint" id="connectRequiredHint" style="display:none;">先にGoogleドライブに接続してください（未接続だと写真が他の端末と共有されません）</div>
       <div id="yearGroups"></div>
       <div class="empty" id="listEmptyMsg" style="display:none;">まだ登録がありません</div>
     </div>
@@ -351,6 +358,7 @@
           <button id="cameraBtn" type="button">📷 撮影する</button>
           <button id="galleryBtn" type="button">🖼️ 写真を選ぶ</button>
         </div>
+        <div class="required-hint" id="photoConnectHint" style="display:none;">先にGoogleドライブに接続してください（未接続だと写真が他の端末と共有されません）</div>
         <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;">
         <input type="file" id="galleryInput" accept="image/*" multiple style="display:none;">
         <div class="field" style="margin-bottom:16px;">
@@ -452,6 +460,7 @@
   const detailView = document.getElementById('detailView');
 
   const newEntryBtn = document.getElementById('newEntryBtn');
+  const connectRequiredHint = document.getElementById('connectRequiredHint');
   const yearGroups = document.getElementById('yearGroups');
   const listEmptyMsg = document.getElementById('listEmptyMsg');
 
@@ -468,6 +477,7 @@
   const summaryBar = document.getElementById('summaryBar');
   const cameraBtn = document.getElementById('cameraBtn');
   const galleryBtn = document.getElementById('galleryBtn');
+  const photoConnectHint = document.getElementById('photoConnectHint');
   const cameraInput = document.getElementById('cameraInput');
   const galleryInput = document.getElementById('galleryInput');
   const memoInput = document.getElementById('memoInput');
@@ -517,6 +527,11 @@
     driveBar.classList.toggle('connected', connected);
     driveStatusText.textContent = connected ? '☁️ Googleドライブ: 接続済み' : '☁️ Googleドライブ: 未接続';
     driveConnectBtn.textContent = connected ? '再接続' : '接続する';
+    newEntryBtn.disabled = !connected;
+    connectRequiredHint.style.display = connected ? 'none' : 'block';
+    cameraBtn.disabled = !connected;
+    galleryBtn.disabled = !connected;
+    photoConnectHint.style.display = connected ? 'none' : 'block';
   }
 
   function disconnectDrive() {
@@ -565,6 +580,8 @@
       setDriveConnected(true);
       scheduleDriveTokenRefresh(saved.expiresAt);
       syncWithDrive();
+    } else {
+      setDriveConnected(false);
     }
   }
 
@@ -887,6 +904,7 @@
   }
 
   newEntryBtn.addEventListener('click', () => {
+    if (!driveAccessToken) return;
     companyInput.value = '';
     modelInput.value = '';
     orderInput.value = '';
@@ -1046,8 +1064,8 @@
     }
   }
 
-  cameraBtn.addEventListener('click', () => cameraInput.click());
-  galleryBtn.addEventListener('click', () => galleryInput.click());
+  cameraBtn.addEventListener('click', () => { if (driveAccessToken) cameraInput.click(); });
+  galleryBtn.addEventListener('click', () => { if (driveAccessToken) galleryInput.click(); });
 
   cameraInput.addEventListener('change', (e) => {
     addFiles(e.target.files);
