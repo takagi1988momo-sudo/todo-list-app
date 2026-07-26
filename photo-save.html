@@ -309,6 +309,7 @@
           <button type="button" id="driveConnectBtn" class="link-btn">接続する</button>
         </span>
       </div>
+      <div class="status-msg" id="driveSyncMsg" style="margin-top:-8px;"></div>
       <button class="next-btn" id="newEntryBtn" type="button">＋ 新しい会社を登録</button>
       <div id="yearGroups"></div>
       <div class="empty" id="listEmptyMsg" style="display:none;">まだ登録がありません</div>
@@ -481,6 +482,7 @@
   const driveStatusText = document.getElementById('driveStatusText');
   const driveConnectBtn = document.getElementById('driveConnectBtn');
   const driveRefreshBtn = document.getElementById('driveRefreshBtn');
+  const driveSyncMsg = document.getElementById('driveSyncMsg');
 
   let currentEntry = null;
   let currentPhotos = [];
@@ -547,7 +549,6 @@
   });
 
   driveRefreshBtn.addEventListener('click', async () => {
-    if (!driveAccessToken) return;
     driveRefreshBtn.disabled = true;
     await syncWithDrive();
     driveRefreshBtn.disabled = false;
@@ -772,13 +773,18 @@
   }
 
   async function syncWithDrive() {
-    if (!driveAccessToken) return;
+    if (!driveAccessToken) {
+      driveSyncMsg.textContent = '先にGoogleドライブに接続してください';
+      return;
+    }
+    driveSyncMsg.textContent = '更新中...';
     try {
       await pullEntriesFromDrive();
       await pushEntriesToDrive();
       await renderList();
+      driveSyncMsg.textContent = '更新しました';
     } catch (err) {
-      // Sync failures are non-fatal; local data remains usable.
+      driveSyncMsg.textContent = `更新に失敗しました: ${err.message || err}`;
     }
   }
 
