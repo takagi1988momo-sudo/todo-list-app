@@ -304,7 +304,10 @@
     <div id="listView">
       <div class="drive-bar" id="driveBar">
         <span id="driveStatusText">☁️ Googleドライブ: 未接続</span>
-        <button type="button" id="driveConnectBtn" class="link-btn">接続する</button>
+        <span>
+          <button type="button" id="driveRefreshBtn" class="link-btn" style="margin-right:10px;">🔄 更新</button>
+          <button type="button" id="driveConnectBtn" class="link-btn">接続する</button>
+        </span>
       </div>
       <button class="next-btn" id="newEntryBtn" type="button">＋ 新しい会社を登録</button>
       <div id="yearGroups"></div>
@@ -477,6 +480,7 @@
   const driveBar = document.getElementById('driveBar');
   const driveStatusText = document.getElementById('driveStatusText');
   const driveConnectBtn = document.getElementById('driveConnectBtn');
+  const driveRefreshBtn = document.getElementById('driveRefreshBtn');
 
   let currentEntry = null;
   let currentPhotos = [];
@@ -521,6 +525,7 @@
           driveAccessToken = tokenResponse.access_token;
           saveDriveToken(tokenResponse.access_token, Number(tokenResponse.expires_in || 3600));
           setDriveConnected(true);
+          syncWithDrive();
         }
       }
     });
@@ -532,12 +537,20 @@
     if (savedToken) {
       driveAccessToken = savedToken;
       setDriveConnected(true);
+      syncWithDrive();
     }
   }
 
   driveConnectBtn.addEventListener('click', () => {
     const client = ensureDriveTokenClient();
     client.requestAccessToken({ prompt: driveAccessToken ? '' : 'consent' });
+  });
+
+  driveRefreshBtn.addEventListener('click', async () => {
+    if (!driveAccessToken) return;
+    driveRefreshBtn.disabled = true;
+    await syncWithDrive();
+    driveRefreshBtn.disabled = false;
   });
 
   async function driveFetch(url, options) {
@@ -590,6 +603,96 @@
       throw new Error(`Drive upload error ${res.status}: ${body}`);
     }
     return res.json();
+  }
+
+  async function findFileInFolder(name, folderId) {
+    const query = `name='${name.replace(/'/g, "\\'")}' and '${folderId}' in parents and trashed=false`;
+    const res = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`, { method: 'GET' });
+    return (res.files && res.files[0]) || null;
+  }
+
+  // ---- Shared entry list sync (company/model/order/memo only — photos stay local) ----
+  const INDEX_FILE_NAME = 'index.json';
+
+  async function pushEntriesToDrive() {
+    if (!driveAccessToken) return;
+    const entries = await listEntries();
+    const payload = entries.map(e => ({
+      id: e.id,
+      company: e.company,
+      model: e.model,
+      order: e.order,
+      memo: e.memo || '',
+      year: e.year,
+      createdAt: e.createdAt,
+      updatedAt: e.updatedAt || e.createdAt
+    }));
+    const rootFolderId = await findOrCreateFolder('写真保存ツール');
+    const existing = await findFileInFolder(INDEX_FILE_NAME, rootFolderId);
+    const jsonBlob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+    if (existing) {
+      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${existing.id}?uploadType=media`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${driveAccessToken}`, 'Content-Type': 'application/json' },
+        body: jsonBlob
+      });
+    } else {
+      const metadata = { name: INDEX_FILE_NAME, parents: [rootFolderId] };
+      const form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+      form.append('file', jsonBlob);
+      await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${driveAccessToken}` },
+        body: form
+      });
+    }
+  }
+
+  async function pullEntriesFromDrive() {
+    if (!driveAccessToken) return;
+    const rootFolderId = await findOrCreateFolder('写真保存ツール');
+    const existing = await findFileInFolder(INDEX_FILE_NAME, rootFolderId);
+    if (!existing) return;
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${existing.id}?alt=media`, {
+      headers: { Authorization: `Bearer ${driveAccessToken}` }
+    });
+    if (!res.ok) return;
+    const remoteEntries = await res.json();
+    for (const re of remoteEntries) {
+      const local = await getEntry(re.id);
+      if (!local) {
+        await addEntry({
+          id: re.id,
+          company: re.company,
+          model: re.model,
+          order: re.order,
+          memo: re.memo || '',
+          year: re.year,
+          createdAt: re.createdAt,
+          updatedAt: re.updatedAt,
+          photoCount: 0
+        });
+      } else if ((re.updatedAt || '') > (local.updatedAt || local.createdAt || '')) {
+        local.company = re.company;
+        local.model = re.model;
+        local.order = re.order;
+        local.memo = re.memo || '';
+        local.updatedAt = re.updatedAt;
+        await putEntry(local);
+      }
+    }
+  }
+
+  async function syncWithDrive() {
+    if (!driveAccessToken) return;
+    try {
+      await pullEntriesFromDrive();
+      await pushEntriesToDrive();
+      await renderList();
+    } catch (err) {
+      // Sync failures are non-fatal; local data remains usable.
+    }
   }
 
   function showView(view) {
@@ -701,11 +804,13 @@
       order: orderInput.value.trim(),
       year: now.getFullYear(),
       createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
       photoCount: 0,
       memo: ''
     };
     await addEntry(entry);
     await openDetail(entry.id);
+    pushEntriesToDrive();
   });
 
   // ---- DETAIL VIEW ----
@@ -722,8 +827,11 @@
 
   memoInput.addEventListener('blur', async () => {
     if (!currentEntry) return;
+    if (currentEntry.memo === memoInput.value) return;
     currentEntry.memo = memoInput.value;
+    currentEntry.updatedAt = new Date().toISOString();
     await putEntry(currentEntry);
+    pushEntriesToDrive();
   });
 
   detailBackLink.addEventListener('click', async () => {
