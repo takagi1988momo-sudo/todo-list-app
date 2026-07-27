@@ -825,7 +825,10 @@
   async function getEntryDriveFolderId(entry) {
     const rootFolderId = await findOrCreateFolder('写真保存ツール');
     const companyFolderId = await findOrCreateFolder(entry.company, rootFolderId);
-    return findOrCreateFolder(entry.id, companyFolderId);
+    const dateStr = (entry.createdAt || '').slice(0, 10);
+    const parts = [sanitize(entry.model), entry.order ? sanitize(entry.order) : null, dateStr, entry.id].filter(Boolean);
+    const folderName = parts.join('_');
+    return findOrCreateFolder(folderName, companyFolderId);
   }
 
   async function uploadPhotoToDrive(photo, entry) {
