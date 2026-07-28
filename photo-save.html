@@ -825,10 +825,7 @@
   async function getEntryDriveFolderId(entry) {
     const rootFolderId = await findOrCreateFolder('写真保存ツール');
     const companyFolderId = await findOrCreateFolder(entry.company, rootFolderId);
-    const dateStr = (entry.createdAt || '').slice(0, 10);
-    const parts = [sanitize(entry.model), entry.order ? sanitize(entry.order) : null, dateStr, entry.id].filter(Boolean);
-    const folderName = parts.join('_');
-    return findOrCreateFolder(folderName, companyFolderId);
+    return findOrCreateFolder(entry.id, companyFolderId);
   }
 
   async function uploadPhotoToDrive(photo, entry) {
@@ -865,11 +862,17 @@
       }
     }
 
-    const remoteIds = new Set(remoteFiles.map(f => f.id));
-    for (const lp of localPhotos) {
-      if (lp.driveFileId && !remoteIds.has(lp.driveFileId)) {
-        await deletePhotoDB(lp.id);
-        changed = true;
+    // Safety: only treat missing-from-remote as "deleted elsewhere" when we got a
+    // non-empty listing back. An empty result is more likely a lookup mismatch
+    // (e.g. wrong/newly-created folder) than a real mass deletion, so skip pruning
+    // local photos in that case to avoid wiping data based on a false signal.
+    if (remoteFiles.length > 0) {
+      const remoteIds = new Set(remoteFiles.map(f => f.id));
+      for (const lp of localPhotos) {
+        if (lp.driveFileId && !remoteIds.has(lp.driveFileId)) {
+          await deletePhotoDB(lp.id);
+          changed = true;
+        }
       }
     }
     return changed;
