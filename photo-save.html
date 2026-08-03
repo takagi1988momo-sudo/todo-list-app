@@ -835,6 +835,7 @@
   function buildReadableFolderName(entry) {
     const dateStr = (entry.createdAt || '').slice(0, 10);
     const parts = [
+      sanitize(entry.company),
       sanitize(entry.model),
       entry.order ? sanitize(entry.order) : null,
       dateStr,
@@ -845,32 +846,35 @@
 
   async function getEntryDriveFolderId(entry) {
     // Once we know the real Drive folder id, always use it directly — never
-    // look it up by name again. This lets the folder be renamed (for
+    // look it up by name again. This lets the folder be renamed/moved (for
     // readability) without ever losing track of which folder is which,
     // which is what caused photos to look "deleted" previously.
     if (entry.driveFolderId) return entry.driveFolderId;
 
     const rootFolderId = await findOrCreateFolder('写真保存ツール');
-    const companyFolderId = await findOrCreateFolder(entry.company, rootFolderId);
+    const readableName = buildReadableFolderName(entry);
 
     // Backward compatibility: entries created before this change have their
-    // Drive folder named after the raw entry id. Find it once, then rename
-    // it to something readable now that we track it by id instead of name.
-    const legacy = await findFileInFolder(entry.id, companyFolderId);
+    // Drive folder nested under a company folder, named after the raw
+    // entry id. Find it once, then rename + move it up to sit directly
+    // under 写真保存ツール with a readable name (company/model/order/date).
+    const companyFolder = await findFileInFolder(entry.company, rootFolderId);
+    const legacy = companyFolder ? await findFileInFolder(entry.id, companyFolder.id) : null;
+
     let folderId;
     if (legacy) {
       folderId = legacy.id;
       try {
-        await driveFetch(`https://www.googleapis.com/drive/v3/files/${folderId}`, {
+        await driveFetch(`https://www.googleapis.com/drive/v3/files/${folderId}?addParents=${rootFolderId}&removeParents=${companyFolder.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: buildReadableFolderName(entry) })
+          body: JSON.stringify({ name: readableName })
         });
       } catch (e) {
-        // rename is best-effort; the folder still works under its old name
+        // rename/move is best-effort; the folder still works where it is
       }
     } else {
-      folderId = await findOrCreateFolder(buildReadableFolderName(entry), companyFolderId);
+      folderId = await findOrCreateFolder(readableName, rootFolderId);
     }
 
     entry.driveFolderId = folderId;
