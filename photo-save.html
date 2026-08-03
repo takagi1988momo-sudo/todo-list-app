@@ -752,7 +752,8 @@
       year: e.year,
       createdAt: e.createdAt,
       updatedAt: e.updatedAt || e.createdAt,
-      deleted: !!e.deleted
+      deleted: !!e.deleted,
+      driveFolderId: e.driveFolderId || null
     }));
     const rootFolderId = await findOrCreateFolder('写真保存ツール');
     const existing = await findFileInFolder(INDEX_FILE_NAME, rootFolderId);
@@ -808,24 +809,73 @@
           createdAt: re.createdAt,
           updatedAt: re.updatedAt,
           photoCount: 0,
-          deleted: false
+          deleted: false,
+          driveFolderId: re.driveFolderId || null
         });
-      } else if (!local.deleted && (re.updatedAt || '') > (local.updatedAt || local.createdAt || '')) {
-        local.company = re.company;
-        local.model = re.model;
-        local.order = re.order;
-        local.memo = re.memo || '';
-        local.updatedAt = re.updatedAt;
-        await putEntry(local);
+      } else {
+        let touched = false;
+        if (!local.deleted && (re.updatedAt || '') > (local.updatedAt || local.createdAt || '')) {
+          local.company = re.company;
+          local.model = re.model;
+          local.order = re.order;
+          local.memo = re.memo || '';
+          local.updatedAt = re.updatedAt;
+          touched = true;
+        }
+        if (!local.driveFolderId && re.driveFolderId) {
+          local.driveFolderId = re.driveFolderId;
+          touched = true;
+        }
+        if (touched) await putEntry(local);
       }
     }
   }
 
   // ---- Photo sync (per-entry Drive folder mirrors local photos) ----
+  function buildReadableFolderName(entry) {
+    const dateStr = (entry.createdAt || '').slice(0, 10);
+    const parts = [
+      sanitize(entry.model),
+      entry.order ? sanitize(entry.order) : null,
+      dateStr,
+      entry.id.slice(-6)
+    ].filter(Boolean);
+    return parts.join('_') || entry.id;
+  }
+
   async function getEntryDriveFolderId(entry) {
+    // Once we know the real Drive folder id, always use it directly — never
+    // look it up by name again. This lets the folder be renamed (for
+    // readability) without ever losing track of which folder is which,
+    // which is what caused photos to look "deleted" previously.
+    if (entry.driveFolderId) return entry.driveFolderId;
+
     const rootFolderId = await findOrCreateFolder('写真保存ツール');
     const companyFolderId = await findOrCreateFolder(entry.company, rootFolderId);
-    return findOrCreateFolder(entry.id, companyFolderId);
+
+    // Backward compatibility: entries created before this change have their
+    // Drive folder named after the raw entry id. Find it once, then rename
+    // it to something readable now that we track it by id instead of name.
+    const legacy = await findFileInFolder(entry.id, companyFolderId);
+    let folderId;
+    if (legacy) {
+      folderId = legacy.id;
+      try {
+        await driveFetch(`https://www.googleapis.com/drive/v3/files/${folderId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: buildReadableFolderName(entry) })
+        });
+      } catch (e) {
+        // rename is best-effort; the folder still works under its old name
+      }
+    } else {
+      folderId = await findOrCreateFolder(buildReadableFolderName(entry), companyFolderId);
+    }
+
+    entry.driveFolderId = folderId;
+    await putEntry(entry);
+    return folderId;
   }
 
   async function uploadPhotoToDrive(photo, entry) {
@@ -1012,7 +1062,8 @@
       updatedAt: now.toISOString(),
       photoCount: 0,
       memo: '',
-      deleted: false
+      deleted: false,
+      driveFolderId: null
     };
     await addEntry(entry);
     await openDetail(entry.id);
