@@ -69,7 +69,6 @@
     padding: 4px 10px;
   }
   .app {
-    max-width: 1200px;
     margin: 0 auto;
     padding: 0 16px;
   }
@@ -211,6 +210,91 @@
   .field input:focus {
     border-color: var(--accent);
   }
+  .field input.date-picker-input {
+    cursor: pointer;
+    background: #fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23667080" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="3" y1="10" x2="21" y2="10"/></svg>') no-repeat right 10px center;
+    background-size: 18px;
+    padding-right: 34px;
+  }
+  .custom-calendar-popup {
+    position: absolute;
+    z-index: 100;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+    padding: 12px;
+    width: 300px;
+    font-family: inherit;
+  }
+  .cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--text);
+  }
+  .cal-header button {
+    border: none;
+    background: transparent;
+    color: var(--accent);
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: 6px;
+  }
+  .cal-header button:hover { background: #e3f1ef; }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+  }
+  .cal-dow {
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 4px 0;
+    font-weight: 600;
+  }
+  .cal-dow.sun { color: var(--danger); }
+  .cal-dow.sat { color: #2563eb; }
+  .cal-day {
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    height: 38px;
+    font-size: 14px;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .cal-day:hover:not(:disabled) { background: #e3f1ef; }
+  .cal-day.sun { color: var(--danger); }
+  .cal-day.sat { color: #2563eb; }
+  .cal-day.holiday { color: var(--danger); }
+  .cal-day.today { box-shadow: inset 0 0 0 2px var(--accent); font-weight: 700; }
+  .cal-day.selected { background: var(--accent); color: #fff !important; font-weight: 700; }
+  .cal-day.disabled { color: #ccc; cursor: not-allowed; }
+  .cal-footer {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .cal-footer button {
+    border: none;
+    background: transparent;
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+  .cal-footer button:hover { background: #e3f1ef; }
   .field input.input-error {
     border-color: var(--danger);
   }
@@ -526,7 +610,7 @@
         </div>
         <div class="field">
           <label for="dueInput">納期</label>
-          <input type="date" id="dueInput">
+          <input type="text" id="dueInput" class="date-picker-input" readonly placeholder="日付を選択">
         </div>
       </div>
 
@@ -547,11 +631,11 @@
             <div class="date-row">
               <div class="field">
                 <label for="drawingStartInput">開始日</label>
-                <input type="date" id="drawingStartInput">
+                <input type="text" id="drawingStartInput" class="date-picker-input" readonly placeholder="日付を選択">
               </div>
               <div class="field">
                 <label for="drawingEndInput">終了日</label>
-                <input type="date" id="drawingEndInput">
+                <input type="text" id="drawingEndInput" class="date-picker-input" readonly placeholder="日付を選択">
               </div>
             </div>
             <div class="weekend-note" id="drawingWeekendNote" style="display:none;">
@@ -576,11 +660,11 @@
             <div class="date-row">
               <div class="field">
                 <label for="casingStartInput">開始日</label>
-                <input type="date" id="casingStartInput">
+                <input type="text" id="casingStartInput" class="date-picker-input" readonly placeholder="日付を選択">
               </div>
               <div class="field">
                 <label for="casingEndInput">終了日</label>
-                <input type="date" id="casingEndInput">
+                <input type="text" id="casingEndInput" class="date-picker-input" readonly placeholder="日付を選択">
               </div>
             </div>
             <div class="weekend-note" id="casingWeekendNote" style="display:none;">
@@ -605,11 +689,11 @@
             <div class="date-row">
               <div class="field">
                 <label for="assemblyStartInput">開始日</label>
-                <input type="date" id="assemblyStartInput">
+                <input type="text" id="assemblyStartInput" class="date-picker-input" readonly placeholder="日付を選択">
               </div>
               <div class="field">
                 <label for="assemblyEndInput">終了日</label>
-                <input type="date" id="assemblyEndInput">
+                <input type="text" id="assemblyEndInput" class="date-picker-input" readonly placeholder="日付を選択">
               </div>
             </div>
             <div class="weekend-note" id="assemblyWeekendNote" style="display:none;">
@@ -632,7 +716,6 @@
         <span class="chip"><span class="swatch" style="background:var(--phase-casing)"></span>ケーシング待ち</span>
         <span class="chip"><span class="swatch" style="background:var(--phase-assembly)"></span>組み立て</span>
         <span class="chip"><span class="swatch" style="background:var(--danger)">▼</span>納期</span>
-        <span class="note">各工程は時間(1日=8時間換算)での入力、またはカレンダーでの開始日・終了日の直接指定のどちらでも設定できます。図面作成→ケーシング待ち→組み立ての順に並びます。時間からの自動計算では土日・祝日は作業日として使われません。カレンダーで日付を指定した際に土日・祝日が含まれる場合は、出勤する日だけ個別にチェックできます。</span>
       </div>
     </div>
 
@@ -682,6 +765,7 @@
   function hideForm() {
     formCard.style.display = 'none';
     toggleFormBtn.style.display = '';
+    closeCalendarPopup();
   }
 
   function load() {
@@ -1046,6 +1130,165 @@
     return null;
   }
 
+  let calendarPopupEl = null;
+  let calendarTriggerEl = null;
+
+  function closeCalendarPopup() {
+    if (calendarPopupEl) {
+      calendarPopupEl.remove();
+      calendarPopupEl = null;
+      calendarTriggerEl = null;
+      document.removeEventListener('mousedown', handleCalendarOutsideClick, true);
+    }
+  }
+
+  function handleCalendarOutsideClick(e) {
+    if (calendarPopupEl && !calendarPopupEl.contains(e.target) && e.target !== calendarTriggerEl) {
+      closeCalendarPopup();
+    }
+  }
+
+  function fireInputChange(inputEl) {
+    inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+    inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function openCalendarFor(inputEl) {
+    if (calendarTriggerEl === inputEl) {
+      closeCalendarPopup();
+      return;
+    }
+    closeCalendarPopup();
+    calendarTriggerEl = inputEl;
+
+    const initial = inputEl.value ? parseISO(inputEl.value) : new Date();
+    let viewYear = initial.getFullYear();
+    let viewMonth = initial.getMonth();
+
+    const popup = document.createElement('div');
+    popup.className = 'custom-calendar-popup';
+
+    function render() {
+      popup.innerHTML = '';
+      const minDate = inputEl.dataset.minDate || '';
+      const todayIso = todayISO();
+
+      const header = document.createElement('div');
+      header.className = 'cal-header';
+      const prevBtn = document.createElement('button');
+      prevBtn.type = 'button';
+      prevBtn.textContent = '◀';
+      prevBtn.addEventListener('click', () => {
+        viewMonth--;
+        if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+        render();
+      });
+      const label = document.createElement('span');
+      label.textContent = `${viewYear}年${viewMonth + 1}月`;
+      const nextBtn = document.createElement('button');
+      nextBtn.type = 'button';
+      nextBtn.textContent = '▶';
+      nextBtn.addEventListener('click', () => {
+        viewMonth++;
+        if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+        render();
+      });
+      header.appendChild(prevBtn);
+      header.appendChild(label);
+      header.appendChild(nextBtn);
+      popup.appendChild(header);
+
+      const grid = document.createElement('div');
+      grid.className = 'cal-grid';
+      ['日', '月', '火', '水', '木', '金', '土'].forEach((label2, i) => {
+        const cell = document.createElement('div');
+        cell.className = 'cal-dow';
+        if (i === 0) cell.classList.add('sun');
+        if (i === 6) cell.classList.add('sat');
+        cell.textContent = label2;
+        grid.appendChild(cell);
+      });
+
+      const first = new Date(viewYear, viewMonth, 1);
+      const startOffset = first.getDay();
+      const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+      for (let i = 0; i < startOffset; i++) {
+        grid.appendChild(document.createElement('div'));
+      }
+      for (let day = 1; day <= daysInMonth; day++) {
+        const d = new Date(viewYear, viewMonth, day);
+        const iso = formatISO(d);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cal-day';
+        btn.textContent = String(day);
+        const dow = d.getDay();
+        if (dow === 0) btn.classList.add('sun');
+        if (dow === 6) btn.classList.add('sat');
+        if (getHolidayName(d)) btn.classList.add('holiday');
+        if (iso === todayIso) btn.classList.add('today');
+        if (iso === inputEl.value) btn.classList.add('selected');
+        if (minDate && iso < minDate) {
+          btn.disabled = true;
+          btn.classList.add('disabled');
+        } else {
+          btn.addEventListener('click', () => {
+            inputEl.value = iso;
+            fireInputChange(inputEl);
+            closeCalendarPopup();
+          });
+        }
+        grid.appendChild(btn);
+      }
+      popup.appendChild(grid);
+
+      const footer = document.createElement('div');
+      footer.className = 'cal-footer';
+      const clearBtn = document.createElement('button');
+      clearBtn.type = 'button';
+      clearBtn.textContent = 'クリア';
+      clearBtn.addEventListener('click', () => {
+        inputEl.value = '';
+        fireInputChange(inputEl);
+        closeCalendarPopup();
+      });
+      const todayBtn = document.createElement('button');
+      todayBtn.type = 'button';
+      todayBtn.textContent = '今日';
+      todayBtn.addEventListener('click', () => {
+        if (!minDate || todayIso >= minDate) {
+          inputEl.value = todayIso;
+          fireInputChange(inputEl);
+          closeCalendarPopup();
+        }
+      });
+      footer.appendChild(clearBtn);
+      footer.appendChild(todayBtn);
+      popup.appendChild(footer);
+    }
+
+    render();
+    document.body.appendChild(popup);
+    calendarPopupEl = popup;
+
+    const rect = inputEl.getBoundingClientRect();
+    let left = window.scrollX + rect.left;
+    const popupWidth = popup.offsetWidth;
+    if (left + popupWidth > window.scrollX + window.innerWidth - 8) {
+      left = window.scrollX + window.innerWidth - popupWidth - 8;
+    }
+    if (left < 8) left = 8;
+    popup.style.top = `${window.scrollY + rect.bottom + 4}px`;
+    popup.style.left = `${left}px`;
+
+    setTimeout(() => document.addEventListener('mousedown', handleCalendarOutsideClick, true), 0);
+  }
+
+  function setupCustomDatePicker(inputEl) {
+    inputEl.addEventListener('click', () => openCalendarFor(inputEl));
+  }
+
   function findNonWorkdaysInRange(startVal, endVal) {
     const start = parseISO(startVal);
     const end = parseISO(endVal);
@@ -1148,10 +1391,10 @@
   function applyEndMin(startInput, endInput, crossPhaseMin) {
     const effectiveMin = laterISO(crossPhaseMin, startInput.value || null);
     if (effectiveMin) {
-      endInput.min = effectiveMin;
+      endInput.dataset.minDate = effectiveMin;
       if (endInput.value && endInput.value < effectiveMin) endInput.value = '';
     } else {
-      endInput.removeAttribute('min');
+      delete endInput.dataset.minDate;
     }
   }
 
@@ -1199,10 +1442,10 @@
 
     if (drawingEnd) {
       const min1 = formatISO(addDays(drawingEnd, 1));
-      casingStartInput.min = min1;
+      casingStartInput.dataset.minDate = min1;
       applyEndMin(casingStartInput, casingEndInput, min1);
     } else {
-      casingStartInput.removeAttribute('min');
+      delete casingStartInput.dataset.minDate;
       applyEndMin(casingStartInput, casingEndInput, null);
     }
 
@@ -1214,10 +1457,10 @@
 
     if (assemblyLowerBound) {
       const min2 = formatISO(addDays(assemblyLowerBound, 1));
-      assemblyStartInput.min = min2;
+      assemblyStartInput.dataset.minDate = min2;
       applyEndMin(assemblyStartInput, assemblyEndInput, min2);
     } else {
-      assemblyStartInput.removeAttribute('min');
+      delete assemblyStartInput.dataset.minDate;
       applyEndMin(assemblyStartInput, assemblyEndInput, null);
     }
 
@@ -1722,6 +1965,10 @@
       el.addEventListener('change', () => syncHoursFromDates(startEl, endEl, hoursEl));
     });
   });
+
+  [dueInput, drawingStartInput, drawingEndInput,
+   casingStartInput, casingEndInput,
+   assemblyStartInput, assemblyEndInput].forEach(setupCustomDatePicker);
 
   driveConnectBtn.addEventListener('click', () => {
     const client = ensureDriveTokenClient();
