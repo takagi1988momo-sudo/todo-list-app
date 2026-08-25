@@ -1,0 +1,1757 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工程表チャート</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root {
+    --bg: #eef1f3;
+    --card-bg: #ffffff;
+    --text: #172026;
+    --muted: #667080;
+    --accent: #0f766e;
+    --accent-hover: #0b5c56;
+    --border: #d8dee2;
+    --danger: #b3261e;
+    --phase-drawing: #2563eb;
+    --phase-casing: #d97706;
+    --phase-assembly: #0f766e;
+    --sat-bg: #e6eef9;
+    --sun-bg: #fbe9e7;
+    --holiday-bg: #fbe9e7;
+    --holiday-text: #b3261e;
+    --due-bg: #f0847b;
+    --today-line: #b3261e;
+    --topbar-bg: #14212a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    padding: 0 0 60px;
+    background: var(--bg);
+    font-family: "Yu Gothic Medium", "Yu Gothic", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+    color: var(--text);
+  }
+  .topbar {
+    background: var(--topbar-bg);
+    color: #f4f6f7;
+    padding: 18px 24px;
+    margin-bottom: 24px;
+  }
+  .topbar-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .topbar h1 {
+    font-size: 19px;
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .topbar .tag {
+    font-size: 11px;
+    color: #9fb0b8;
+    letter-spacing: 0.08em;
+  }
+  .storage-warning {
+    margin-left: auto;
+    font-size: 12px;
+    color: #ffd7a8;
+    background: rgba(217, 119, 6, 0.25);
+    border: 1px solid #d97706;
+    border-radius: 6px;
+    padding: 4px 10px;
+  }
+  .app {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 16px;
+  }
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 16px;
+    margin: 0 0 14px;
+  }
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px 12px;
+  }
+  @media (max-width: 900px) {
+    .form-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  .phase-groups {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 16px;
+  }
+  @media (max-width: 900px) {
+    .phase-groups { grid-template-columns: 1fr; }
+  }
+  .phase-group {
+    border-left: 4px solid var(--phase-color, var(--accent));
+    background: #fafbfc;
+    border-radius: 0 6px 6px 0;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .phase-group h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .phase-group .hint {
+    font-size: 11px;
+    color: var(--muted);
+    margin: -4px 0 2px;
+  }
+  .hours-preview {
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .weekend-note {
+    background: var(--holiday-bg);
+    border: 1px solid var(--due-bg);
+    border-radius: 6px;
+    padding: 6px 8px;
+  }
+  .weekend-note-title {
+    font-size: 11px;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .weekend-note-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+  }
+  .weekend-note-list label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .weekend-note-list input[type="checkbox"] {
+    flex-shrink: 0;
+  }
+  .phase-group .date-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .phase-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .phase-toggle-btn {
+    padding: 5px 12px;
+    border: 1px solid var(--phase-color, var(--accent));
+    border-radius: 6px;
+    background: transparent;
+    color: var(--phase-color, var(--accent));
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  .phase-toggle-btn:hover {
+    background: var(--phase-color, var(--accent));
+    color: white;
+  }
+  .phase-summary {
+    font-size: 13px;
+    color: var(--text);
+  }
+  .phase-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .field label {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .field input[type="text"],
+  .field input[type="date"],
+  .field input[type="number"] {
+    padding: 9px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    outline: none;
+    font-family: inherit;
+  }
+  .field input:focus {
+    border-color: var(--accent);
+  }
+  .field input.input-error {
+    border-color: var(--danger);
+  }
+  .field-error {
+    font-size: 12px;
+    color: var(--danger);
+  }
+  .field.checkbox {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    padding-top: 18px;
+  }
+  .field.checkbox label { font-size: 13px; color: var(--text); }
+  .form-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 4px;
+  }
+  .form-actions button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .form-actions button:hover { background: var(--accent-hover); }
+  .form-actions .cancel-btn {
+    background: transparent;
+    color: var(--muted);
+    text-decoration: underline;
+    font-weight: 400;
+    padding: 10px 4px;
+  }
+  .form-actions .cancel-btn:hover { color: var(--danger); background: transparent; }
+
+  .legend {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    align-items: center;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .legend .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend .swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    display: inline-block;
+  }
+  .legend .note {
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .gantt-wrap {
+    overflow: auto;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    max-height: 72vh;
+  }
+  table.gantt {
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 12px;
+  }
+  table.gantt th, table.gantt td {
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .corner {
+    position: sticky;
+    left: 0;
+    top: 0;
+    z-index: 4;
+    background: var(--card-bg);
+    min-width: 140px;
+    width: 140px;
+    text-align: left;
+    padding: 6px 8px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  thead th.month-th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #e9edf0;
+    padding: 3px 0;
+    font-weight: 600;
+    color: var(--text);
+    font-size: 11px;
+  }
+  thead th.day-th {
+    position: sticky;
+    top: 22px;
+    z-index: 2;
+    background: var(--card-bg);
+    min-width: 22px;
+    width: 22px;
+    padding: 2px 0 3px;
+    font-weight: 500;
+    text-align: center;
+    line-height: 1.25;
+    font-size: 12px;
+  }
+  thead th.day-th .dow { display: block; font-size: 9px; color: var(--muted); }
+  thead th.day-th.sat { background: var(--sat-bg); }
+  thead th.day-th.sun { background: var(--sun-bg); }
+  thead th.day-th.holiday { background: var(--holiday-bg); color: var(--holiday-text); }
+  thead th.day-th.today { box-shadow: inset 0 0 0 2px var(--today-line); }
+
+  tbody th.row-label {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--card-bg);
+    min-width: 140px;
+    width: 140px;
+    text-align: left;
+    padding: 4px 18px;
+    vertical-align: top;
+    font-weight: 400;
+  }
+  tbody th.row-label .company {
+    font-weight: 700;
+    font-size: 13px;
+    line-height: 1.3;
+  }
+  tbody th.row-label .model {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  tbody th.row-label .due {
+    font-size: 10px;
+    color: var(--text);
+  }
+  tbody th.row-label .delay {
+    font-size: 10px;
+    color: var(--danger);
+    font-weight: 600;
+  }
+  tbody tr { position: relative; }
+  tbody th.row-label .edit-btn,
+  tbody th.row-label .del-btn {
+    position: absolute;
+    top: 2px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 3px 6px;
+    border-radius: 5px;
+  }
+  tbody th.row-label .edit-btn { left: 4px; }
+  tbody th.row-label .del-btn { right: 4px; }
+  tbody th.row-label .edit-btn:hover { color: var(--accent); background: #e3f1ef; }
+  tbody th.row-label .del-btn:hover { color: var(--danger); background: #fbe9e7; }
+
+  td.day-cell {
+    min-width: 26px;
+    width: 26px;
+    height: 30px;
+    position: relative;
+    padding: 0;
+  }
+  td.day-cell.sat { background: var(--sat-bg); }
+  td.day-cell.sun { background: var(--sun-bg); }
+  td.day-cell.holiday { background: var(--holiday-bg); }
+  td.day-cell.today { box-shadow: inset 0 0 0 2px var(--today-line); }
+  td.day-cell .bar {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    left: 0;
+    right: 0;
+    height: 14px;
+  }
+  td.day-cell .bar.segment-start {
+    border-top-left-radius: 7px;
+    border-bottom-left-radius: 7px;
+  }
+  td.day-cell .bar.segment-end {
+    border-top-right-radius: 7px;
+    border-bottom-right-radius: 7px;
+  }
+  td.day-cell.phase-drawing .bar { background: var(--phase-drawing); }
+  td.day-cell.phase-casing .bar { background: var(--phase-casing); }
+  td.day-cell.phase-assembly .bar { background: var(--phase-assembly); }
+  td.day-cell.due-marker {
+    background: var(--due-bg);
+  }
+  td.day-cell.due-marker::before {
+    content: '納期';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: -0.05em;
+    color: #ffffff;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .empty-state {
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    padding: 40px 0;
+  }
+  .row-label { white-space: normal; }
+
+  .toolbar {
+    display: flex;
+    margin-bottom: 20px;
+  }
+  .add-toggle-btn {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .add-toggle-btn:hover { background: var(--accent-hover); }
+
+  .drive-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    font-size: 13px;
+  }
+  .drive-bar #driveStatusText {
+    color: var(--muted);
+  }
+  .drive-bar.connected #driveStatusText {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .drive-bar .link-btn {
+    border: none;
+    background: transparent;
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 2px 4px;
+  }
+  .drive-bar .link-btn:hover { color: var(--accent-hover); }
+  .drive-sync-msg {
+    font-size: 12px;
+    color: var(--muted);
+    margin: -10px 0 16px 2px;
+  }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <h1>工程表チャート</h1>
+      <span class="tag">PRODUCTION SCHEDULE</span>
+    </div>
+  </header>
+  <div class="app">
+    <div class="drive-bar" id="driveBar">
+      <span id="driveStatusText">☁️ Googleドライブ: 未接続</span>
+      <span>
+        <button type="button" id="driveRefreshBtn" class="link-btn" style="margin-right:10px;">🔄 更新</button>
+        <button type="button" id="driveConnectBtn" class="link-btn">接続する</button>
+      </span>
+    </div>
+    <div class="drive-sync-msg" id="driveSyncMsg"></div>
+    <div class="toolbar">
+      <button type="button" id="toggleFormBtn" class="add-toggle-btn">＋ 会社名追加</button>
+    </div>
+    <div class="card" id="formCard" style="display:none;">
+      <h2 id="formTitle">会社名追加</h2>
+      <div class="form-grid">
+        <div class="field">
+          <label for="companyInput">会社名</label>
+          <input type="text" id="companyInput" placeholder="例: 〇〇工業" maxlength="60">
+          <span class="field-error" id="companyError" style="display:none;">会社名を入力してください</span>
+        </div>
+        <div class="field">
+          <label for="modelInput">型式</label>
+          <input type="text" id="modelInput" placeholder="例: XJ-200" maxlength="60">
+        </div>
+        <div class="field">
+          <label for="dueInput">納期</label>
+          <input type="date" id="dueInput">
+        </div>
+      </div>
+
+      <div class="phase-groups">
+        <div class="phase-group" style="--phase-color: var(--phase-drawing);">
+          <div class="phase-header">
+            <h3>① 図面作成</h3>
+            <button type="button" class="phase-toggle-btn" data-phase="drawing">＋ 追加</button>
+          </div>
+          <div class="phase-summary" data-phase="drawing" style="display:none;"></div>
+          <div class="phase-inputs" data-phase="drawing" style="display:none;">
+            <div class="field">
+              <label for="drawingHoursInput">時間(h)</label>
+              <input type="number" id="drawingHoursInput" min="0" step="1" placeholder="例: 16">
+              <span class="hours-preview" id="drawingHoursPreview"></span>
+            </div>
+            <div class="hint">またはカレンダーで日付を直接指定(指定時は時間より優先)</div>
+            <div class="date-row">
+              <div class="field">
+                <label for="drawingStartInput">開始日</label>
+                <input type="date" id="drawingStartInput">
+              </div>
+              <div class="field">
+                <label for="drawingEndInput">終了日</label>
+                <input type="date" id="drawingEndInput">
+              </div>
+            </div>
+            <div class="weekend-note" id="drawingWeekendNote" style="display:none;">
+              <div class="weekend-note-title">土日・祝日が含まれています。出勤する日にチェック:</div>
+              <div class="weekend-note-list" id="drawingWeekendNoteList"></div>
+            </div>
+          </div>
+        </div>
+        <div class="phase-group" style="--phase-color: var(--phase-casing);">
+          <div class="phase-header">
+            <h3>② ケーシング待ち</h3>
+            <button type="button" class="phase-toggle-btn" data-phase="casing">＋ 追加</button>
+          </div>
+          <div class="phase-summary" data-phase="casing" style="display:none;"></div>
+          <div class="phase-inputs" data-phase="casing" style="display:none;">
+            <div class="field">
+              <label for="casingHoursInput">時間(h)</label>
+              <input type="number" id="casingHoursInput" min="0" step="1" placeholder="例: 40">
+              <span class="hours-preview" id="casingHoursPreview"></span>
+            </div>
+            <div class="hint">またはカレンダーで日付を直接指定(指定時は時間より優先・図面作成より後の日付のみ選択可)</div>
+            <div class="date-row">
+              <div class="field">
+                <label for="casingStartInput">開始日</label>
+                <input type="date" id="casingStartInput">
+              </div>
+              <div class="field">
+                <label for="casingEndInput">終了日</label>
+                <input type="date" id="casingEndInput">
+              </div>
+            </div>
+            <div class="weekend-note" id="casingWeekendNote" style="display:none;">
+              <div class="weekend-note-title">土日・祝日が含まれています。出勤する日にチェック:</div>
+              <div class="weekend-note-list" id="casingWeekendNoteList"></div>
+            </div>
+          </div>
+        </div>
+        <div class="phase-group" style="--phase-color: var(--phase-assembly);">
+          <div class="phase-header">
+            <h3>③ 組み立て</h3>
+            <button type="button" class="phase-toggle-btn" data-phase="assembly">＋ 追加</button>
+          </div>
+          <div class="phase-summary" data-phase="assembly" style="display:none;"></div>
+          <div class="phase-inputs" data-phase="assembly" style="display:none;">
+            <div class="field">
+              <label for="assemblyHoursInput">時間(h)</label>
+              <input type="number" id="assemblyHoursInput" min="0" step="1" placeholder="例: 24">
+              <span class="hours-preview" id="assemblyHoursPreview"></span>
+            </div>
+            <div class="hint">またはカレンダーで日付を直接指定(指定時は時間より優先・ケーシング待ちより後の日付のみ選択可)</div>
+            <div class="date-row">
+              <div class="field">
+                <label for="assemblyStartInput">開始日</label>
+                <input type="date" id="assemblyStartInput">
+              </div>
+              <div class="field">
+                <label for="assemblyEndInput">終了日</label>
+                <input type="date" id="assemblyEndInput">
+              </div>
+            </div>
+            <div class="weekend-note" id="assemblyWeekendNote" style="display:none;">
+              <div class="weekend-note-title">土日・祝日が含まれています。出勤する日にチェック:</div>
+              <div class="weekend-note-list" id="assemblyWeekendNoteList"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button id="submitBtn">追加</button>
+        <button type="button" id="cancelEditBtn" class="cancel-btn" style="display:none;">戻る</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="legend">
+        <span class="chip"><span class="swatch" style="background:var(--phase-drawing)"></span>図面作成</span>
+        <span class="chip"><span class="swatch" style="background:var(--phase-casing)"></span>ケーシング待ち</span>
+        <span class="chip"><span class="swatch" style="background:var(--phase-assembly)"></span>組み立て</span>
+        <span class="chip"><span class="swatch" style="background:var(--danger)">▼</span>納期</span>
+        <span class="note">各工程は時間(1日=8時間換算)での入力、またはカレンダーでの開始日・終了日の直接指定のどちらでも設定できます。図面作成→ケーシング待ち→組み立ての順に並びます。時間からの自動計算では土日・祝日は作業日として使われません。カレンダーで日付を指定した際に土日・祝日が含まれる場合は、出勤する日だけ個別にチェックできます。</span>
+      </div>
+    </div>
+
+    <div class="gantt-wrap" id="ganttWrap"></div>
+  </div>
+
+<script>
+(function () {
+  const STORAGE_KEY = 'gantt-chart-projects-v1';
+  let projects = load();
+  let editingId = null;
+  let storageWarningShown = false;
+
+  const companyInput = document.getElementById('companyInput');
+  const companyError = document.getElementById('companyError');
+  const modelInput = document.getElementById('modelInput');
+  const dueInput = document.getElementById('dueInput');
+  const drawingHoursInput = document.getElementById('drawingHoursInput');
+  const drawingStartInput = document.getElementById('drawingStartInput');
+  const drawingEndInput = document.getElementById('drawingEndInput');
+  const drawingHoursPreview = document.getElementById('drawingHoursPreview');
+  const casingHoursInput = document.getElementById('casingHoursInput');
+  const casingStartInput = document.getElementById('casingStartInput');
+  const casingEndInput = document.getElementById('casingEndInput');
+  const casingHoursPreview = document.getElementById('casingHoursPreview');
+  const assemblyHoursInput = document.getElementById('assemblyHoursInput');
+  const assemblyStartInput = document.getElementById('assemblyStartInput');
+  const assemblyEndInput = document.getElementById('assemblyEndInput');
+  const assemblyHoursPreview = document.getElementById('assemblyHoursPreview');
+  const submitBtn = document.getElementById('submitBtn');
+  const cancelEditBtn = document.getElementById('cancelEditBtn');
+  const formTitle = document.getElementById('formTitle');
+  const ganttWrap = document.getElementById('ganttWrap');
+  const formCard = document.getElementById('formCard');
+  const toggleFormBtn = document.getElementById('toggleFormBtn');
+  const driveBar = document.getElementById('driveBar');
+  const driveStatusText = document.getElementById('driveStatusText');
+  const driveConnectBtn = document.getElementById('driveConnectBtn');
+  const driveRefreshBtn = document.getElementById('driveRefreshBtn');
+  const driveSyncMsg = document.getElementById('driveSyncMsg');
+
+  function showForm() {
+    formCard.style.display = '';
+    toggleFormBtn.style.display = 'none';
+  }
+
+  function hideForm() {
+    formCard.style.display = 'none';
+    toggleFormBtn.style.display = '';
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+      queueDrivePush();
+    } catch (e) {
+      showStorageWarning();
+    }
+  }
+
+  function showStorageWarning() {
+    if (storageWarningShown) return;
+    storageWarningShown = true;
+    const warn = document.createElement('div');
+    warn.className = 'storage-warning';
+    warn.textContent = 'この端末・ブラウザでは保存機能が無効になっているため、変更は今の画面を閉じると失われます。';
+    document.querySelector('.topbar-inner').appendChild(warn);
+  }
+
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  const DRIVE_CLIENT_ID = '566343587966-g0nmhg84rvn5r277eatoonpvov21hii2.apps.googleusercontent.com';
+  const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+  const DRIVE_TOKEN_STORAGE_KEY = 'gantt-drive-token';
+  const DRIVE_FOLDER_NAME = '工程表チャートツール';
+  const DRIVE_DATA_FILE_NAME = 'projects.json';
+
+  let driveAccessToken = null;
+  let driveTokenClient = null;
+  let driveRefreshTimer = null;
+  let drivePushTimer = null;
+
+  function setDriveConnected(connected) {
+    driveBar.classList.toggle('connected', connected);
+    driveStatusText.textContent = connected ? '☁️ Googleドライブ: 接続済み' : '☁️ Googleドライブ: 未接続';
+    driveConnectBtn.textContent = connected ? '再接続' : '接続する';
+  }
+
+  function saveDriveToken(accessToken, expiresInSeconds) {
+    const expiresAt = Date.now() + (expiresInSeconds * 1000);
+    localStorage.setItem(DRIVE_TOKEN_STORAGE_KEY, JSON.stringify({ accessToken, expiresAt }));
+    return expiresAt;
+  }
+
+  function loadDriveToken() {
+    try {
+      const raw = localStorage.getItem(DRIVE_TOKEN_STORAGE_KEY);
+      if (!raw) return null;
+      const { accessToken, expiresAt } = JSON.parse(raw);
+      if (!accessToken || !expiresAt || Date.now() >= expiresAt) return null;
+      return { accessToken, expiresAt };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function disconnectDrive() {
+    driveAccessToken = null;
+    localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
+    if (driveRefreshTimer) { clearTimeout(driveRefreshTimer); driveRefreshTimer = null; }
+    setDriveConnected(false);
+  }
+
+  function isAuthError(err) {
+    return String((err && err.message) || err).includes('401');
+  }
+
+  function scheduleDriveTokenRefresh(expiresAt) {
+    if (driveRefreshTimer) clearTimeout(driveRefreshTimer);
+    const REFRESH_MARGIN_MS = 5 * 60 * 1000;
+    const delay = Math.max(0, expiresAt - Date.now() - REFRESH_MARGIN_MS);
+    driveRefreshTimer = setTimeout(() => {
+      const client = ensureDriveTokenClient();
+      client.requestAccessToken({ prompt: '' });
+    }, delay);
+  }
+
+  function ensureDriveTokenClient() {
+    if (driveTokenClient) return driveTokenClient;
+    driveTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: DRIVE_CLIENT_ID,
+      scope: DRIVE_SCOPE,
+      callback: (tokenResponse) => {
+        if (tokenResponse && tokenResponse.access_token) {
+          driveAccessToken = tokenResponse.access_token;
+          const expiresAt = saveDriveToken(tokenResponse.access_token, Number(tokenResponse.expires_in || 3600));
+          setDriveConnected(true);
+          scheduleDriveTokenRefresh(expiresAt);
+          syncWithDrive();
+        }
+      }
+    });
+    return driveTokenClient;
+  }
+
+  function trySilentReconnect(retriesLeft) {
+    if (!window.google || !google.accounts || !google.accounts.oauth2) {
+      if (retriesLeft > 0) setTimeout(() => trySilentReconnect(retriesLeft - 1), 300);
+      return;
+    }
+    try {
+      const client = ensureDriveTokenClient();
+      client.requestAccessToken({ prompt: '' });
+    } catch (e) {
+      // silent attempt failed; user can still connect manually
+    }
+  }
+
+  async function driveFetch(url, options) {
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        ...(options && options.headers),
+        Authorization: `Bearer ${driveAccessToken}`
+      }
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Drive API error ${res.status}: ${body}`);
+    }
+    return res.json();
+  }
+
+  async function findOrCreateFolder(name, parentId) {
+    const parentClause = parentId ? `'${parentId}' in parents` : `'root' in parents`;
+    const query = `mimeType='application/vnd.google-apps.folder' and name='${name.replace(/'/g, "\\'")}' and ${parentClause} and trashed=false`;
+    const listRes = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`, { method: 'GET' });
+    if (listRes.files && listRes.files.length > 0) return listRes.files[0].id;
+    const metadata = { name, mimeType: 'application/vnd.google-apps.folder', parents: parentId ? [parentId] : undefined };
+    const createRes = await driveFetch('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(metadata)
+    });
+    return createRes.id;
+  }
+
+  async function findFileInFolder(name, folderId) {
+    const query = `name='${name.replace(/'/g, "\\'")}' and '${folderId}' in parents and trashed=false`;
+    const res = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`, { method: 'GET' });
+    return (res.files && res.files[0]) || null;
+  }
+
+  async function pushProjectsToDrive() {
+    if (!driveAccessToken) return;
+    const rootFolderId = await findOrCreateFolder(DRIVE_FOLDER_NAME);
+    const existing = await findFileInFolder(DRIVE_DATA_FILE_NAME, rootFolderId);
+    const jsonBlob = new Blob([JSON.stringify(projects)], { type: 'application/json' });
+    if (existing) {
+      const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${existing.id}?uploadType=media`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${driveAccessToken}`, 'Content-Type': 'application/json' },
+        body: jsonBlob
+      });
+      if (!res.ok) throw new Error(`Drive API error ${res.status}`);
+    } else {
+      const metadata = { name: DRIVE_DATA_FILE_NAME, parents: [rootFolderId] };
+      const form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+      form.append('file', jsonBlob);
+      const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${driveAccessToken}` },
+        body: form
+      });
+      if (!res.ok) throw new Error(`Drive API error ${res.status}`);
+    }
+  }
+
+  async function pullProjectsFromDrive() {
+    if (!driveAccessToken) return;
+    const rootFolderId = await findOrCreateFolder(DRIVE_FOLDER_NAME);
+    const existing = await findFileInFolder(DRIVE_DATA_FILE_NAME, rootFolderId);
+    if (!existing) return;
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${existing.id}?alt=media`, {
+      headers: { Authorization: `Bearer ${driveAccessToken}` }
+    });
+    if (!res.ok) {
+      if (res.status === 401) throw new Error('Drive API error 401');
+      return;
+    }
+    const remoteProjects = await res.json();
+    if (!Array.isArray(remoteProjects)) return;
+
+    const merged = new Map();
+    projects.forEach(p => merged.set(p.id, p));
+    remoteProjects.forEach(rp => {
+      const local = merged.get(rp.id);
+      if (!local || (rp.updatedAt || 0) > (local.updatedAt || 0)) {
+        merged.set(rp.id, rp);
+      }
+    });
+    projects = Array.from(merged.values());
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+  }
+
+  async function syncWithDrive() {
+    if (!driveAccessToken) {
+      driveSyncMsg.textContent = '先にGoogleドライブに接続してください';
+      return;
+    }
+    driveSyncMsg.textContent = '更新中...';
+    try {
+      await pullProjectsFromDrive();
+      await pushProjectsToDrive();
+      render();
+      driveSyncMsg.textContent = '更新しました';
+    } catch (err) {
+      if (isAuthError(err)) {
+        disconnectDrive();
+        driveSyncMsg.textContent = '接続が切れました。もう一度「接続する」を押してください';
+      } else {
+        driveSyncMsg.textContent = `更新に失敗しました: ${err.message || err}`;
+      }
+    }
+  }
+
+  function queueDrivePush() {
+    if (!driveAccessToken) return;
+    if (drivePushTimer) clearTimeout(drivePushTimer);
+    drivePushTimer = setTimeout(() => {
+      pushProjectsToDrive().catch(err => {
+        if (isAuthError(err)) {
+          disconnectDrive();
+          driveSyncMsg.textContent = '接続が切れました。もう一度「接続する」を押してください';
+        }
+      });
+    }, 800);
+  }
+
+  function todayISO() {
+    return formatISO(new Date());
+  }
+
+  function parseISO(dateStr) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+
+  function formatISO(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function addDays(date, n) {
+    const d = new Date(date);
+    d.setDate(d.getDate() + n);
+    return d;
+  }
+
+  function vernalEquinoxDay(year) {
+    return Math.floor(20.8431 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+  }
+
+  function autumnalEquinoxDay(year) {
+    return Math.floor(23.2488 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+  }
+
+  function computeHolidays(year) {
+    const holidays = new Map();
+
+    const add = (month, day, name) => {
+      holidays.set(formatISO(new Date(year, month - 1, day)), name);
+    };
+
+    const addNthMonday = (month, n, name) => {
+      const first = new Date(year, month - 1, 1);
+      const firstDow = first.getDay();
+      const day = 1 + ((1 - firstDow + 7) % 7) + (n - 1) * 7;
+      add(month, day, name);
+    };
+
+    add(1, 1, '元日');
+    addNthMonday(1, 2, '成人の日');
+    if (year >= 1967) add(2, 11, '建国記念の日');
+    if (year >= 2020) add(2, 23, '天皇誕生日');
+    else if (year <= 2018) add(12, 23, '天皇誕生日');
+    add(3, vernalEquinoxDay(year), '春分の日');
+    add(4, 29, '昭和の日');
+    add(5, 3, '憲法記念日');
+    add(5, 4, 'みどりの日');
+    add(5, 5, 'こどもの日');
+    addNthMonday(7, 3, '海の日');
+    if (year >= 2016) add(8, 11, '山の日');
+    addNthMonday(9, 3, '敬老の日');
+    add(9, autumnalEquinoxDay(year), '秋分の日');
+    addNthMonday(10, 2, 'スポーツの日');
+    add(11, 3, '文化の日');
+    add(11, 23, '勤労感謝の日');
+
+    const holidaySet = new Set(holidays.keys());
+
+    let cursor = new Date(year, 0, 1);
+    const endOfYear = new Date(year, 11, 31);
+    const bridgeDays = [];
+    while (cursor <= endOfYear) {
+      const iso = formatISO(cursor);
+      if (!holidaySet.has(iso) && cursor.getDay() !== 0) {
+        const prevIso = formatISO(addDays(cursor, -1));
+        const nextIso = formatISO(addDays(cursor, 1));
+        if (holidaySet.has(prevIso) && holidaySet.has(nextIso)) {
+          bridgeDays.push(iso);
+        }
+      }
+      cursor = addDays(cursor, 1);
+    }
+    bridgeDays.forEach(iso => {
+      holidays.set(iso, '国民の休日');
+      holidaySet.add(iso);
+    });
+
+    const sundayHolidays = Array.from(holidaySet).filter(iso => parseISO(iso).getDay() === 0);
+    sundayHolidays.forEach(iso => {
+      let d = addDays(parseISO(iso), 1);
+      while (holidaySet.has(formatISO(d))) {
+        d = addDays(d, 1);
+      }
+      const substIso = formatISO(d);
+      holidays.set(substIso, '振替休日');
+      holidaySet.add(substIso);
+    });
+
+    return holidays;
+  }
+
+  const holidayCache = {};
+
+  function getHolidayName(date) {
+    const year = date.getFullYear();
+    if (!holidayCache[year]) holidayCache[year] = computeHolidays(year);
+    return holidayCache[year].get(formatISO(date)) || null;
+  }
+
+  function isWorkday(date, includeWeekends) {
+    if (includeWeekends) return true;
+    const dow = date.getDay();
+    if (dow === 0 || dow === 6) return false;
+    if (getHolidayName(date)) return false;
+    return true;
+  }
+
+  function nonWorkdayLabel(date) {
+    const holidayName = getHolidayName(date);
+    if (holidayName) return holidayName;
+    const dow = date.getDay();
+    if (dow === 0) return '日曜日';
+    if (dow === 6) return '土曜日';
+    return null;
+  }
+
+  function findNonWorkdaysInRange(startVal, endVal) {
+    const start = parseISO(startVal);
+    const end = parseISO(endVal);
+    if (end < start) return [];
+    const found = [];
+    let d = new Date(start);
+    while (d <= end) {
+      const label = nonWorkdayLabel(d);
+      if (label) found.push({ iso: formatISO(d), label });
+      d = addDays(d, 1);
+    }
+    return found;
+  }
+
+  const phaseWeekendOverrides = { drawing: new Set(), casing: new Set(), assembly: new Set() };
+
+  const WEEKEND_NOTE_IDS = {
+    drawing: { note: 'drawingWeekendNote', list: 'drawingWeekendNoteList' },
+    casing: { note: 'casingWeekendNote', list: 'casingWeekendNoteList' },
+    assembly: { note: 'assemblyWeekendNote', list: 'assemblyWeekendNoteList' }
+  };
+
+  function updateWeekendNote(phaseKey, startInput, endInput) {
+    const ids = WEEKEND_NOTE_IDS[phaseKey];
+    const noteEl = document.getElementById(ids.note);
+    const listEl = document.getElementById(ids.list);
+
+    const startVal = startInput.value;
+    const endVal = endInput.value;
+    if (!startVal && !endVal) {
+      noteEl.style.display = 'none';
+      return;
+    }
+    const rangeStart = startVal || endVal;
+    const rangeEnd = endVal || startVal;
+    if (rangeEnd < rangeStart) {
+      noteEl.style.display = 'none';
+      return;
+    }
+    const nonWorkdays = findNonWorkdaysInRange(rangeStart, rangeEnd);
+    if (nonWorkdays.length === 0) {
+      noteEl.style.display = 'none';
+      return;
+    }
+    const overrides = phaseWeekendOverrides[phaseKey];
+    listEl.innerHTML = '';
+    nonWorkdays.forEach(({ iso, label }) => {
+      const [, m, d] = iso.split('-');
+      const row = document.createElement('label');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = overrides.has(iso);
+      cb.addEventListener('change', () => {
+        if (cb.checked) overrides.add(iso);
+        else overrides.delete(iso);
+      });
+      const span = document.createElement('span');
+      span.textContent = `${Number(m)}/${Number(d)}(${label})`;
+      row.appendChild(cb);
+      row.appendChild(span);
+      listEl.appendChild(row);
+    });
+    noteEl.style.display = '';
+  }
+
+  function tentativePhaseRange(startVal, endVal, hoursVal, fallbackStart, includeWeekends) {
+    const start = startVal ? parseISO(startVal) : fallbackStart;
+    if (endVal) {
+      const end = parseISO(endVal);
+      return end >= start ? { start, end } : null;
+    }
+    const hours = Number(hoursVal) || 0;
+    if (hours > 0) {
+      let effectiveStart = new Date(start);
+      while (!isWorkday(effectiveStart, includeWeekends)) effectiveStart = addDays(effectiveStart, 1);
+      let d = new Date(effectiveStart);
+      const days = Math.ceil(hours / 8);
+      let count = 0;
+      while (count < days) {
+        if (isWorkday(d, includeWeekends)) count++;
+        if (count < days) d = addDays(d, 1);
+      }
+      return { start: effectiveStart, end: d };
+    }
+    if (startVal) return { start, end: start };
+    return null;
+  }
+
+  function tentativePhaseEnd(startVal, endVal, hoursVal, fallbackStart, includeWeekends) {
+    const range = tentativePhaseRange(startVal, endVal, hoursVal, fallbackStart, includeWeekends);
+    return range ? range.end : null;
+  }
+
+  function laterISO(a, b) {
+    if (!a) return b || null;
+    if (!b) return a;
+    return a > b ? a : b;
+  }
+
+  function applyEndMin(startInput, endInput, crossPhaseMin) {
+    const effectiveMin = laterISO(crossPhaseMin, startInput.value || null);
+    if (effectiveMin) {
+      endInput.min = effectiveMin;
+      if (endInput.value && endInput.value < effectiveMin) endInput.value = '';
+    } else {
+      endInput.removeAttribute('min');
+    }
+  }
+
+  function countCalendarDays(startVal, endVal) {
+    const start = parseISO(startVal);
+    const end = parseISO(endVal);
+    if (end < start) return 0;
+    return Math.round((end - start) / 86400000) + 1;
+  }
+
+  function syncHoursFromDates(startInput, endInput, hoursInput) {
+    if (startInput.value && endInput.value && endInput.value >= startInput.value) {
+      hoursInput.value = countCalendarDays(startInput.value, endInput.value) * 8;
+    }
+  }
+
+  function formatShortDow(iso) {
+    const d = parseISO(iso);
+    const dow = ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
+    return `${d.getMonth() + 1}/${d.getDate()}(${dow})`;
+  }
+
+  function updatePhasePreview(previewEl, startInput, endInput, range) {
+    if (startInput.value || endInput.value || !range) {
+      previewEl.textContent = '';
+      return;
+    }
+    const startIso = formatISO(range.start);
+    const endIso = formatISO(range.end);
+    previewEl.textContent = startIso === endIso
+      ? `→ ${formatShortDow(startIso)}`
+      : `→ ${formatShortDow(startIso)}〜${formatShortDow(endIso)}`;
+  }
+
+  function updateDateConstraints() {
+    const includeWeekends = false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    applyEndMin(drawingStartInput, drawingEndInput, null);
+
+    const drawingRange = tentativePhaseRange(drawingStartInput.value, drawingEndInput.value, drawingHoursInput.value, today, includeWeekends);
+    const drawingEnd = drawingRange ? drawingRange.end : null;
+    updatePhasePreview(drawingHoursPreview, drawingStartInput, drawingEndInput, drawingRange);
+
+    if (drawingEnd) {
+      const min1 = formatISO(addDays(drawingEnd, 1));
+      casingStartInput.min = min1;
+      applyEndMin(casingStartInput, casingEndInput, min1);
+    } else {
+      casingStartInput.removeAttribute('min');
+      applyEndMin(casingStartInput, casingEndInput, null);
+    }
+
+    const casingFallbackStart = drawingEnd ? addDays(drawingEnd, 1) : today;
+    const casingRange = tentativePhaseRange(casingStartInput.value, casingEndInput.value, casingHoursInput.value, casingFallbackStart, includeWeekends);
+    const casingEnd = casingRange ? casingRange.end : null;
+    updatePhasePreview(casingHoursPreview, casingStartInput, casingEndInput, casingRange);
+    const assemblyLowerBound = casingEnd || drawingEnd;
+
+    if (assemblyLowerBound) {
+      const min2 = formatISO(addDays(assemblyLowerBound, 1));
+      assemblyStartInput.min = min2;
+      applyEndMin(assemblyStartInput, assemblyEndInput, min2);
+    } else {
+      assemblyStartInput.removeAttribute('min');
+      applyEndMin(assemblyStartInput, assemblyEndInput, null);
+    }
+
+    const assemblyFallbackStart = assemblyLowerBound ? addDays(assemblyLowerBound, 1) : today;
+    const assemblyRange = tentativePhaseRange(assemblyStartInput.value, assemblyEndInput.value, assemblyHoursInput.value, assemblyFallbackStart, includeWeekends);
+    updatePhasePreview(assemblyHoursPreview, assemblyStartInput, assemblyEndInput, assemblyRange);
+  }
+
+  const PHASE_INPUT_IDS = {
+    drawing: { hours: 'drawingHoursInput', start: 'drawingStartInput', end: 'drawingEndInput' },
+    casing: { hours: 'casingHoursInput', start: 'casingStartInput', end: 'casingEndInput' },
+    assembly: { hours: 'assemblyHoursInput', start: 'assemblyStartInput', end: 'assemblyEndInput' }
+  };
+
+  function getPhaseUI(phaseKey) {
+    const ids = PHASE_INPUT_IDS[phaseKey];
+    return {
+      hours: document.getElementById(ids.hours),
+      start: document.getElementById(ids.start),
+      end: document.getElementById(ids.end),
+      inputsEl: document.querySelector(`.phase-inputs[data-phase="${phaseKey}"]`),
+      summaryEl: document.querySelector(`.phase-summary[data-phase="${phaseKey}"]`),
+      toggleBtn: document.querySelector(`.phase-toggle-btn[data-phase="${phaseKey}"]`)
+    };
+  }
+
+  function phaseHasValue(ui) {
+    return Number(ui.hours.value) > 0 || !!ui.start.value || !!ui.end.value;
+  }
+
+  function summarizePhase(ui) {
+    const short = (iso) => { const [, m, d] = iso.split('-'); return `${Number(m)}/${Number(d)}`; };
+    if (ui.start.value && ui.end.value) return `${short(ui.start.value)}〜${short(ui.end.value)}指定`;
+    if (ui.start.value) return `${short(ui.start.value)}開始・${ui.hours.value || 0}h`;
+    return `${ui.hours.value || 0}h`;
+  }
+
+  function renderPhasePanel(phaseKey, expanded) {
+    const ui = getPhaseUI(phaseKey);
+    if (expanded) {
+      ui.inputsEl.style.display = '';
+      ui.summaryEl.style.display = 'none';
+      ui.toggleBtn.textContent = '反映';
+    } else {
+      ui.inputsEl.style.display = 'none';
+      if (phaseHasValue(ui)) {
+        ui.summaryEl.style.display = '';
+        ui.summaryEl.textContent = summarizePhase(ui);
+        ui.toggleBtn.textContent = '時間変更';
+      } else {
+        ui.summaryEl.style.display = 'none';
+        ui.toggleBtn.textContent = '＋ 追加';
+      }
+    }
+  }
+
+  function collapseAllPhasePanels() {
+    ['drawing', 'casing', 'assembly'].forEach(key => renderPhasePanel(key, false));
+  }
+
+  Object.keys(PHASE_INPUT_IDS).forEach(phaseKey => {
+    const btn = document.querySelector(`.phase-toggle-btn[data-phase="${phaseKey}"]`);
+    btn.addEventListener('click', () => {
+      const ui = getPhaseUI(phaseKey);
+      const isExpanded = ui.inputsEl.style.display !== 'none';
+      renderPhasePanel(phaseKey, !isExpanded);
+      if (isExpanded) updateDateConstraints();
+    });
+  });
+
+  function scheduleProject(project) {
+    const phases = [
+      { key: 'drawing', hours: Number(project.drawingHours) || 0, start: project.drawingStart || '', end: project.drawingEnd || '', weekendOverrides: new Set(project.drawingWeekendOverrides || []) },
+      { key: 'casing', hours: Number(project.casingHours) || 0, start: project.casingStart || '', end: project.casingEnd || '', weekendOverrides: new Set(project.casingWeekendOverrides || []) },
+      { key: 'assembly', hours: Number(project.assemblyHours) || 0, start: project.assemblyStart || '', end: project.assemblyEnd || '', weekendOverrides: new Set(project.assemblyWeekendOverrides || []) }
+    ];
+    let cursor = parseISO(project.startDate);
+    while (!isWorkday(cursor, false)) cursor = addDays(cursor, 1);
+    const schedule = {};
+    let lastDate = project.startDate;
+    let hasAny = false;
+
+    phases.forEach(phase => {
+      const phaseStart = phase.start ? parseISO(phase.start) : cursor;
+
+      if (phase.end) {
+        const endDate = parseISO(phase.end);
+        if (endDate >= phaseStart) {
+          let d = new Date(phaseStart);
+          while (d <= endDate) {
+            const iso = formatISO(d);
+            if (isWorkday(d, false) || phase.weekendOverrides.has(iso)) {
+              schedule[iso] = { phase: phase.key, hoursUsed: 8 };
+            }
+            d = addDays(d, 1);
+          }
+          lastDate = phase.end;
+          hasAny = true;
+          cursor = addDays(endDate, 1);
+        } else {
+          cursor = phaseStart;
+        }
+      } else if (phase.hours > 0) {
+        let d = new Date(phaseStart);
+        while (!isWorkday(d, false)) d = addDays(d, 1);
+        const days = Math.ceil(phase.hours / 8);
+        const remainder = phase.hours % 8;
+        let count = 0;
+        while (count < days) {
+          if (isWorkday(d, false)) {
+            const iso = formatISO(d);
+            count++;
+            const isLastDay = count === days;
+            const hoursUsed = isLastDay && remainder > 0 ? remainder : 8;
+            schedule[iso] = { phase: phase.key, hoursUsed };
+            lastDate = iso;
+            hasAny = true;
+          }
+          d = addDays(d, 1);
+        }
+        cursor = d;
+      } else if (phase.start) {
+        cursor = phaseStart;
+      }
+    });
+
+    return { schedule, endDate: hasAny ? lastDate : project.startDate };
+  }
+
+  function computeRange(scheduledProjects) {
+    if (scheduledProjects.length === 0) {
+      const start = addDays(new Date(), -2);
+      const end = addDays(new Date(), 28);
+      return { start, end };
+    }
+    let minDate = null;
+    let maxDate = null;
+    scheduledProjects.forEach(p => {
+      const candidates = Object.keys(p.schedule);
+      candidates.push(p.project.startDate);
+      if (p.project.dueDate) candidates.push(p.project.dueDate);
+      candidates.forEach(iso => {
+        const d = parseISO(iso);
+        if (!minDate || d < minDate) minDate = d;
+        if (!maxDate || d > maxDate) maxDate = d;
+      });
+    });
+    const start = addDays(minDate, -2);
+    let end = addDays(maxDate, 3);
+    const MIN_SPAN_DAYS = 30;
+    if ((end - start) / 86400000 < MIN_SPAN_DAYS) {
+      end = addDays(start, MIN_SPAN_DAYS);
+    }
+    return { start, end };
+  }
+
+  function buildDayList(start, end) {
+    const days = [];
+    let cur = new Date(start);
+    while (cur <= end) {
+      days.push(new Date(cur));
+      cur = addDays(cur, 1);
+    }
+    return days;
+  }
+
+  function resetForm() {
+    editingId = null;
+    companyInput.value = '';
+    companyInput.classList.remove('input-error');
+    companyError.style.display = 'none';
+    modelInput.value = '';
+    dueInput.value = '';
+    drawingHoursInput.value = '';
+    drawingStartInput.value = '';
+    drawingEndInput.value = '';
+    casingHoursInput.value = '';
+    casingStartInput.value = '';
+    casingEndInput.value = '';
+    assemblyHoursInput.value = '';
+    assemblyStartInput.value = '';
+    assemblyEndInput.value = '';
+    phaseWeekendOverrides.drawing = new Set();
+    phaseWeekendOverrides.casing = new Set();
+    phaseWeekendOverrides.assembly = new Set();
+    submitBtn.textContent = '追加';
+    formTitle.textContent = '会社名追加';
+    cancelEditBtn.textContent = '戻る';
+    cancelEditBtn.style.display = 'inline-block';
+    updateDateConstraints();
+    updateWeekendNote('drawing', drawingStartInput, drawingEndInput);
+    updateWeekendNote('casing', casingStartInput, casingEndInput);
+    updateWeekendNote('assembly', assemblyStartInput, assemblyEndInput);
+    collapseAllPhasePanels();
+  }
+
+  function startEdit(id) {
+    const p = projects.find(p => p.id === id);
+    if (!p) return;
+    editingId = id;
+    companyInput.value = p.company;
+    modelInput.value = p.model;
+    dueInput.value = p.dueDate || '';
+    drawingHoursInput.value = p.drawingHours || '';
+    drawingStartInput.value = p.drawingStart || '';
+    drawingEndInput.value = p.drawingEnd || '';
+    casingHoursInput.value = p.casingHours || '';
+    casingStartInput.value = p.casingStart || '';
+    casingEndInput.value = p.casingEnd || '';
+    assemblyHoursInput.value = p.assemblyHours || '';
+    assemblyStartInput.value = p.assemblyStart || '';
+    assemblyEndInput.value = p.assemblyEnd || '';
+    phaseWeekendOverrides.drawing = new Set(p.drawingWeekendOverrides || []);
+    phaseWeekendOverrides.casing = new Set(p.casingWeekendOverrides || []);
+    phaseWeekendOverrides.assembly = new Set(p.assemblyWeekendOverrides || []);
+    submitBtn.textContent = '更新';
+    formTitle.textContent = '会社名編集';
+    cancelEditBtn.textContent = '編集をキャンセル';
+    cancelEditBtn.style.display = 'inline-block';
+    updateDateConstraints();
+    updateWeekendNote('drawing', drawingStartInput, drawingEndInput);
+    updateWeekendNote('casing', casingStartInput, casingEndInput);
+    updateWeekendNote('assembly', assemblyStartInput, assemblyEndInput);
+    collapseAllPhasePanels();
+    showForm();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function deleteProject(id) {
+    const idx = projects.findIndex(p => p.id === id);
+    if (idx === -1) return;
+    projects[idx] = { ...projects[idx], deleted: true, updatedAt: Date.now() };
+    save();
+    render();
+  }
+
+  function submitForm() {
+    const company = companyInput.value.trim();
+    const model = modelInput.value.trim();
+    if (!company) {
+      companyInput.classList.add('input-error');
+      companyError.style.display = '';
+      companyInput.focus();
+      return;
+    }
+    companyInput.classList.remove('input-error');
+    companyError.style.display = 'none';
+    const existing = editingId ? projects.find(p => p.id === editingId) : null;
+    const startDate = existing ? existing.startDate : todayISO();
+    const data = {
+      company,
+      model,
+      dueDate: dueInput.value || '',
+      startDate,
+      drawingHours: Number(drawingHoursInput.value) || 0,
+      drawingStart: drawingStartInput.value || '',
+      drawingEnd: drawingEndInput.value || '',
+      drawingWeekendOverrides: Array.from(phaseWeekendOverrides.drawing),
+      casingHours: Number(casingHoursInput.value) || 0,
+      casingStart: casingStartInput.value || '',
+      casingEnd: casingEndInput.value || '',
+      casingWeekendOverrides: Array.from(phaseWeekendOverrides.casing),
+      assemblyHours: Number(assemblyHoursInput.value) || 0,
+      assemblyStart: assemblyStartInput.value || '',
+      assemblyEnd: assemblyEndInput.value || '',
+      assemblyWeekendOverrides: Array.from(phaseWeekendOverrides.assembly),
+      updatedAt: Date.now()
+    };
+    if (editingId) {
+      const idx = projects.findIndex(p => p.id === editingId);
+      if (idx !== -1) projects[idx] = { id: editingId, ...data };
+    } else {
+      projects.push({ id: uid(), ...data });
+    }
+    save();
+    resetForm();
+    hideForm();
+    render();
+  }
+
+  function render() {
+    ganttWrap.innerHTML = '';
+
+    const visibleProjects = projects.filter(p => !p.deleted);
+
+    const scheduledProjects = visibleProjects.map(project => {
+      const { schedule, endDate } = scheduleProject(project);
+      const phaseRanges = {};
+      Object.keys(schedule).forEach(iso => {
+        const phase = schedule[iso].phase;
+        if (!phaseRanges[phase]) phaseRanges[phase] = { start: iso, end: iso };
+        if (iso < phaseRanges[phase].start) phaseRanges[phase].start = iso;
+        if (iso > phaseRanges[phase].end) phaseRanges[phase].end = iso;
+      });
+      return { project, schedule, endDate, phaseRanges };
+    });
+
+    const { start, end } = computeRange(scheduledProjects);
+    const days = buildDayList(start, end);
+    const today = todayISO();
+    const dowLabels = ['日', '月', '火', '水', '木', '金', '土'];
+
+    const table = document.createElement('table');
+    table.className = 'gantt';
+
+    const thead = document.createElement('thead');
+
+    const monthRow = document.createElement('tr');
+    const corner = document.createElement('th');
+    corner.className = 'corner';
+    corner.rowSpan = 2;
+    corner.textContent = '会社名 / 型式 / 納期';
+    monthRow.appendChild(corner);
+
+    let i = 0;
+    while (i < days.length) {
+      const d = days[i];
+      const monthKey = `${d.getFullYear()}-${d.getMonth()}`;
+      let span = 0;
+      let j = i;
+      while (j < days.length && `${days[j].getFullYear()}-${days[j].getMonth()}` === monthKey) {
+        span++;
+        j++;
+      }
+      const th = document.createElement('th');
+      th.className = 'month-th';
+      th.colSpan = span;
+      th.textContent = `${d.getFullYear()}年${d.getMonth() + 1}月`;
+      monthRow.appendChild(th);
+      i = j;
+    }
+    thead.appendChild(monthRow);
+
+    const dayRow = document.createElement('tr');
+    days.forEach(d => {
+      const th = document.createElement('th');
+      const dow = d.getDay();
+      th.className = 'day-th';
+      if (dow === 6) th.classList.add('sat');
+      if (dow === 0) th.classList.add('sun');
+      const holidayName = getHolidayName(d);
+      if (holidayName) {
+        th.classList.add('holiday');
+        th.title = holidayName;
+      }
+      const iso = formatISO(d);
+      if (iso === today) th.classList.add('today');
+      th.innerHTML = `${d.getDate()}<span class="dow">${dowLabels[dow]}</span>`;
+      dayRow.appendChild(th);
+    });
+    thead.appendChild(dayRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    scheduledProjects.forEach(({ project, schedule, endDate, phaseRanges }) => {
+      const tr = document.createElement('tr');
+
+      const th = document.createElement('th');
+      th.className = 'row-label';
+      th.style.position = 'relative';
+
+      const editBtn = document.createElement('button');
+      editBtn.className = 'edit-btn';
+      editBtn.textContent = '✎';
+      editBtn.title = '編集';
+      editBtn.addEventListener('click', () => startEdit(project.id));
+      th.appendChild(editBtn);
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'del-btn';
+      delBtn.textContent = '✕';
+      delBtn.title = '削除';
+      delBtn.addEventListener('click', () => {
+        if (confirm(`${project.company || '(会社名未入力)'} を削除しますか?`)) {
+          deleteProject(project.id);
+        }
+      });
+      th.appendChild(delBtn);
+
+      const companyDiv = document.createElement('div');
+      companyDiv.className = 'company';
+      companyDiv.textContent = project.company || '(会社名未入力)';
+      th.appendChild(companyDiv);
+
+      if (project.model) {
+        const modelDiv = document.createElement('div');
+        modelDiv.className = 'model';
+        modelDiv.textContent = project.model;
+        th.appendChild(modelDiv);
+      }
+
+      if (project.dueDate) {
+        const dueDiv = document.createElement('div');
+        dueDiv.className = 'due';
+        dueDiv.textContent = `納期: ${project.dueDate}`;
+        th.appendChild(dueDiv);
+      }
+
+      if (project.dueDate && endDate > project.dueDate) {
+        const delayDiv = document.createElement('div');
+        delayDiv.className = 'delay';
+        delayDiv.textContent = `⚠ 納期超過(完了予定 ${endDate})`;
+        th.appendChild(delayDiv);
+      }
+
+      tr.appendChild(th);
+
+      days.forEach(d => {
+        const iso = formatISO(d);
+        const td = document.createElement('td');
+        td.className = 'day-cell';
+        const dow = d.getDay();
+        if (dow === 6) td.classList.add('sat');
+        if (dow === 0) td.classList.add('sun');
+        if (getHolidayName(d)) td.classList.add('holiday');
+        if (iso === today) td.classList.add('today');
+        if (project.dueDate && iso === project.dueDate) td.classList.add('due-marker');
+
+        const cell = schedule[iso];
+        if (cell) {
+          const phase = cell.phase;
+          const hoursUsed = cell.hoursUsed || 8;
+          td.classList.add(`phase-${phase}`);
+          const bar = document.createElement('div');
+          bar.className = 'bar';
+          const range = phaseRanges[phase];
+          if (range && iso === range.start) bar.classList.add('segment-start');
+          if (range && iso === range.end) bar.classList.add('segment-end');
+          td.appendChild(bar);
+          const phaseLabel = phase === 'drawing' ? '図面作成' : phase === 'casing' ? 'ケーシング待ち' : '組み立て';
+          const hoursNote = hoursUsed < 8 ? ` ${hoursUsed}h/8h` : '';
+          td.title = `${project.company || ''} ${project.model || ''} - ${phaseLabel} (${iso})${hoursNote}`;
+        }
+
+        tr.appendChild(td);
+      });
+
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+
+    ganttWrap.appendChild(table);
+
+    if (visibleProjects.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.textContent = '会社名がありません。上のフォームから追加してください。';
+      ganttWrap.appendChild(empty);
+    }
+  }
+
+  submitBtn.addEventListener('click', submitForm);
+  cancelEditBtn.addEventListener('click', () => {
+    resetForm();
+    hideForm();
+  });
+  toggleFormBtn.addEventListener('click', () => {
+    resetForm();
+    showForm();
+    companyInput.focus();
+  });
+  companyInput.addEventListener('input', () => {
+    companyInput.classList.remove('input-error');
+    companyError.style.display = 'none';
+  });
+
+  [companyInput, modelInput, dueInput,
+   drawingHoursInput, drawingStartInput, drawingEndInput,
+   casingHoursInput, casingStartInput, casingEndInput,
+   assemblyHoursInput, assemblyStartInput, assemblyEndInput].forEach(el => {
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+      }
+    });
+  });
+
+  [
+    ['drawing', drawingStartInput, drawingEndInput],
+    ['casing', casingStartInput, casingEndInput],
+    ['assembly', assemblyStartInput, assemblyEndInput]
+  ].forEach(([phaseKey, startEl, endEl]) => {
+    [startEl, endEl].forEach(el => {
+      el.addEventListener('input', () => updateWeekendNote(phaseKey, startEl, endEl));
+      el.addEventListener('change', () => updateWeekendNote(phaseKey, startEl, endEl));
+    });
+  });
+  [drawingHoursInput, drawingStartInput, drawingEndInput,
+   casingHoursInput, casingStartInput, casingEndInput,
+   assemblyHoursInput, assemblyStartInput, assemblyEndInput].forEach(el => {
+    el.addEventListener('input', updateDateConstraints);
+    el.addEventListener('change', updateDateConstraints);
+  });
+
+  [
+    [drawingStartInput, drawingEndInput, drawingHoursInput],
+    [casingStartInput, casingEndInput, casingHoursInput],
+    [assemblyStartInput, assemblyEndInput, assemblyHoursInput]
+  ].forEach(([startEl, endEl, hoursEl]) => {
+    [startEl, endEl].forEach(el => {
+      el.addEventListener('input', () => syncHoursFromDates(startEl, endEl, hoursEl));
+      el.addEventListener('change', () => syncHoursFromDates(startEl, endEl, hoursEl));
+    });
+  });
+
+  driveConnectBtn.addEventListener('click', () => {
+    const client = ensureDriveTokenClient();
+    client.requestAccessToken({ prompt: driveAccessToken ? '' : 'consent' });
+  });
+
+  driveRefreshBtn.addEventListener('click', async () => {
+    driveRefreshBtn.disabled = true;
+    await syncWithDrive();
+    driveRefreshBtn.disabled = false;
+  });
+
+  resetForm();
+  hideForm();
+  updateDateConstraints();
+  render();
+
+  {
+    const saved = loadDriveToken();
+    if (saved) {
+      driveAccessToken = saved.accessToken;
+      setDriveConnected(true);
+      scheduleDriveTokenRefresh(saved.expiresAt);
+      syncWithDrive();
+    } else {
+      setDriveConnected(false);
+      trySilentReconnect(10);
+    }
+  }
+})();
+</script>
+</body>
+</html>
