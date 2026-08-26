@@ -499,7 +499,7 @@
     background: var(--due-bg);
   }
   td.day-cell.due-marker::before {
-    content: '納期';
+    content: '出荷日';
     position: absolute;
     inset: 0;
     display: flex;
@@ -609,7 +609,7 @@
           <input type="text" id="modelInput" placeholder="例: XJ-200" maxlength="60">
         </div>
         <div class="field">
-          <label for="dueInput">納期</label>
+          <label for="dueInput">出荷日</label>
           <input type="text" id="dueInput" class="date-picker-input" readonly placeholder="日付を選択">
         </div>
       </div>
@@ -715,7 +715,7 @@
         <span class="chip"><span class="swatch" style="background:var(--phase-drawing)"></span>図面作成</span>
         <span class="chip"><span class="swatch" style="background:var(--phase-casing)"></span>ケーシング待ち</span>
         <span class="chip"><span class="swatch" style="background:var(--phase-assembly)"></span>組み立て</span>
-        <span class="chip"><span class="swatch" style="background:var(--danger)">▼</span>納期</span>
+        <span class="chip"><span class="swatch" style="background:var(--danger)">▼</span>出荷日</span>
       </div>
     </div>
 
@@ -1527,7 +1527,10 @@
       const ui = getPhaseUI(phaseKey);
       const isExpanded = ui.inputsEl.style.display !== 'none';
       renderPhasePanel(phaseKey, !isExpanded);
-      if (isExpanded) updateDateConstraints();
+      if (isExpanded) {
+        updateDateConstraints();
+        if (upsertProjectFromForm()) render();
+      }
     });
   });
 
@@ -1697,15 +1700,10 @@
     render();
   }
 
-  function submitForm() {
+  function upsertProjectFromForm() {
     const company = companyInput.value.trim();
     const model = modelInput.value.trim();
-    if (!company) {
-      companyInput.classList.add('input-error');
-      companyError.style.display = '';
-      companyInput.focus();
-      return;
-    }
+    if (!company) return false;
     companyInput.classList.remove('input-error');
     companyError.style.display = 'none';
     const existing = editingId ? projects.find(p => p.id === editingId) : null;
@@ -1733,9 +1731,25 @@
       const idx = projects.findIndex(p => p.id === editingId);
       if (idx !== -1) projects[idx] = { id: editingId, ...data };
     } else {
-      projects.push({ id: uid(), ...data });
+      const newId = uid();
+      projects.push({ id: newId, ...data });
+      editingId = newId;
+      submitBtn.textContent = '更新';
+      formTitle.textContent = '会社名編集';
+      cancelEditBtn.textContent = '編集をキャンセル';
     }
     save();
+    return true;
+  }
+
+  function submitForm() {
+    if (!companyInput.value.trim()) {
+      companyInput.classList.add('input-error');
+      companyError.style.display = '';
+      companyInput.focus();
+      return;
+    }
+    upsertProjectFromForm();
     resetForm();
     hideForm();
     render();
@@ -1772,7 +1786,7 @@
     const corner = document.createElement('th');
     corner.className = 'corner';
     corner.rowSpan = 2;
-    corner.textContent = '会社名 / 型式 / 納期';
+    corner.textContent = '会社名 / 型式 / 出荷日';
     monthRow.appendChild(corner);
 
     let i = 0;
@@ -1855,14 +1869,14 @@
       if (project.dueDate) {
         const dueDiv = document.createElement('div');
         dueDiv.className = 'due';
-        dueDiv.textContent = `納期: ${project.dueDate}`;
+        dueDiv.textContent = `出荷日: ${project.dueDate}`;
         th.appendChild(dueDiv);
       }
 
       if (project.dueDate && endDate > project.dueDate) {
         const delayDiv = document.createElement('div');
         delayDiv.className = 'delay';
-        delayDiv.textContent = `⚠ 納期超過(完了予定 ${endDate})`;
+        delayDiv.textContent = `⚠ 出荷日超過(完了予定 ${endDate})`;
         th.appendChild(delayDiv);
       }
 
