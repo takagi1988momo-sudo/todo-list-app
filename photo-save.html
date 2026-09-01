@@ -711,9 +711,30 @@
   }
 
   async function listFilesInFolder(folderId) {
+    // Drive's files.list can return a partial page even when the true
+    // result set is smaller than pageSize -- its own docs warn "partial or
+    // empty result pages are possible even before the end of the files
+    // list has been reached". Not following nextPageToken here caused
+    // different devices (or even the same device on different calls) to
+    // see different, incomplete subsets of one folder's contents, which
+    // both under-counted photos AND risked the pruning step below treating
+    // a still-present file as "deleted elsewhere" just because this
+    // particular page didn't include it. Loop until nextPageToken is gone.
     const query = `'${folderId}' in parents and trashed=false`;
-    const res = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,createdTime)`, { method: 'GET' });
-    return res.files || [];
+    let files = [];
+    let pageToken = null;
+    do {
+      const params = new URLSearchParams({
+        q: query,
+        fields: 'nextPageToken, files(id,name,createdTime)',
+        pageSize: '1000'
+      });
+      if (pageToken) params.set('pageToken', pageToken);
+      const res = await driveFetch(`https://www.googleapis.com/drive/v3/files?${params.toString()}`, { method: 'GET' });
+      files = files.concat(res.files || []);
+      pageToken = res.nextPageToken || null;
+    } while (pageToken);
+    return files;
   }
 
   async function driveDeleteFile(fileId) {
