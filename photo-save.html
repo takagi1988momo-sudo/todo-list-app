@@ -1146,9 +1146,8 @@
     // TEMPORARY diagnostics: show the entry id / cached folder id / local
     // photo count so mismatches between devices can be compared directly
     // instead of guessed at.
-    statusMsg.textContent = `[診断] id末尾:${currentEntry.id.slice(-6)} folder:${currentEntry.driveFolderId ? currentEntry.driveFolderId.slice(-8) : 'なし'} local:${currentPhotos.length}枚`;
-
     if (driveAccessToken) {
+      const before = `[診断]\nid末尾: ${currentEntry.id.slice(-6)}\nfolder(前): ${currentEntry.driveFolderId ? currentEntry.driveFolderId.slice(-8) : 'なし'}\nlocal(前): ${currentPhotos.length}枚`;
       try {
         const { changed, failedCount } = await pullPhotosForEntry(currentEntry);
         if (changed && currentEntry) {
@@ -1157,13 +1156,15 @@
           await putEntry(currentEntry);
           renderPhotoGrid();
         }
-        statusMsg.textContent += ` → folder:${currentEntry.driveFolderId ? currentEntry.driveFolderId.slice(-8) : 'なし'} local:${currentPhotos.length}枚`;
-        if (failedCount > 0) statusMsg.textContent += ` / ${failedCount}枚失敗`;
+        const after = `folder(後): ${currentEntry.driveFolderId ? currentEntry.driveFolderId.slice(-8) : 'なし'}\nlocal(後): ${currentPhotos.length}枚\n失敗: ${failedCount}枚`;
+        statusMsg.textContent = '';
+        alert(`${before}\n${after}`);
       } catch (e) {
         if (isAuthError(e)) {
           disconnectDrive();
           statusMsg.textContent = '接続が切れました。もう一度「接続する」を押してください';
         } else {
+          alert(`${before}\nエラー: ${e.message || e}`);
           statusMsg.textContent = '';
         }
       }
