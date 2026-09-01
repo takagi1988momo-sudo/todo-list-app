@@ -914,8 +914,30 @@
     // such photos stay counted locally forever without ever appearing in
     // Drive, and without a driveFileId the pruning check below can't tell
     // they're actually orphaned.
+    //
+    // Before uploading, check by filename whether it's already sitting in
+    // Drive (the earlier attempt may have actually succeeded — the upload
+    // completed but the local record never got its driveFileId saved).
+    // Re-uploading in that case would create a genuine duplicate file.
+    const unclaimedByName = new Map();
+    for (const rf of remoteFiles) {
+      if (!localByDriveId.has(rf.id)) {
+        if (!unclaimedByName.has(rf.name)) unclaimedByName.set(rf.name, []);
+        unclaimedByName.get(rf.name).push(rf);
+      }
+    }
     for (const lp of localPhotos) {
       if (!lp.driveFileId) {
+        const candidates = unclaimedByName.get(lp.name);
+        const existing = candidates && candidates.length ? candidates.shift() : null;
+        if (existing) {
+          lp.driveFileId = existing.id;
+          lp.createdAt = existing.createdTime || lp.createdAt;
+          await putPhoto(lp);
+          localByDriveId.set(existing.id, lp);
+          changed = true;
+          continue;
+        }
         try {
           const driveFileId = await uploadPhotoToDrive(lp, entry);
           lp.driveFileId = driveFileId;
