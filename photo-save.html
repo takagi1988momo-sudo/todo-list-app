@@ -1575,14 +1575,6 @@
     }
   });
 
-  window.__debugConn = {
-    setDriveConnected, setToken: (t) => { driveAccessToken = t; },
-    addEntry, listEntries, addPhoto, listPhotosForEntry,
-    setCurrentEntry: async (id) => { currentEntry = await getEntry(id); currentPhotos = await listPhotosForEntry(id); },
-    getCurrentEntry: () => currentEntry,
-    getCurrentPhotos: () => currentPhotos
-  };
-
   // ---- init ----
   renderList();
   showView('list');
