@@ -845,14 +845,26 @@
   }
 
   async function getEntryDriveFolderId(entry) {
-    // Once we know the real Drive folder id, always use it directly — never
-    // look it up by name again. This lets the folder be renamed/moved (for
-    // readability) without ever losing track of which folder is which,
-    // which is what caused photos to look "deleted" previously.
-    if (entry.driveFolderId) return entry.driveFolderId;
-
     const rootFolderId = await findOrCreateFolder('写真保存ツール');
     const readableName = buildReadableFolderName(entry);
+
+    // Always confirm against the deterministic name-based lookup, rather
+    // than trusting a cached id blindly. Different devices can end up with
+    // different cached ids for the same entry (e.g. one cached an id before
+    // a fix like this existed), and without re-checking, they silently stay
+    // split forever — photos uploaded by one device are invisible to the
+    // other even though both think they're synced. This makes every
+    // resolution self-heal to the one canonical folder.
+    const canonical = await findFileInFolder(readableName, rootFolderId);
+    if (canonical) {
+      if (entry.driveFolderId !== canonical.id) {
+        entry.driveFolderId = canonical.id;
+        await putEntry(entry);
+      }
+      return canonical.id;
+    }
+
+    if (entry.driveFolderId) return entry.driveFolderId;
 
     // Backward compatibility: entries created before this change have their
     // Drive folder nested under a company folder, named after the raw
