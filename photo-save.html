@@ -942,6 +942,27 @@
       await pullEntriesFromDrive();
       await pushEntriesToDrive();
       await renderList();
+
+      // Also pull photos for every company, not just the list/metadata,
+      // so the list-screen refresh button brings in photos added on other
+      // devices without having to open each company individually.
+      const entries = (await listEntries()).filter(e => !e.deleted);
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        driveSyncMsg.textContent = `写真を同期中... (${i + 1}/${entries.length})`;
+        try {
+          const changed = await pullPhotosForEntry(entry);
+          if (changed) {
+            const photos = await listPhotosForEntry(entry.id);
+            entry.photoCount = photos.length;
+            await putEntry(entry);
+          }
+        } catch (e) {
+          if (isAuthError(e)) throw e;
+          // skip this entry's photos on non-auth errors, keep going with the rest
+        }
+      }
+      await renderList();
       driveSyncMsg.textContent = '更新しました';
     } catch (err) {
       if (isAuthError(err)) {
