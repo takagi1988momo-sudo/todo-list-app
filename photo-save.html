@@ -402,7 +402,10 @@
         <div class="empty" id="photoEmptyMsg">まだ写真がありません</div>
         <div class="footer-row">
           <span id="countLabel">0枚</span>
-          <button type="button" id="downloadZipBtn" class="link-btn">ZIPでダウンロード</button>
+          <span>
+            <button type="button" id="dedupeBtn" class="link-btn" style="margin-right:10px;">🧹 重複を整理</button>
+            <button type="button" id="downloadZipBtn" class="link-btn">ZIPでダウンロード</button>
+          </span>
         </div>
         <div class="status-msg" id="statusMsg"></div>
       </div>
@@ -526,6 +529,7 @@
   const photoEmptyMsg = document.getElementById('photoEmptyMsg');
   const countLabel = document.getElementById('countLabel');
   const downloadZipBtn = document.getElementById('downloadZipBtn');
+  const dedupeBtn = document.getElementById('dedupeBtn');
   const statusMsg = document.getElementById('statusMsg');
   const deleteEntryBtn = document.getElementById('deleteEntryBtn');
   const driveBar = document.getElementById('driveBar');
@@ -1507,6 +1511,77 @@
       statusMsg.textContent = '保存に失敗しました';
     }
   });
+
+  dedupeBtn.addEventListener('click', async () => {
+    if (!driveAccessToken || !currentEntry) {
+      statusMsg.textContent = '先にGoogleドライブに接続してください';
+      return;
+    }
+    dedupeBtn.disabled = true;
+    statusMsg.textContent = '重複を確認中...';
+    try {
+      const entryFolderId = await getEntryDriveFolderId(currentEntry);
+      const remoteFiles = await listFilesInFolder(entryFolderId);
+
+      const byName = new Map();
+      for (const rf of remoteFiles) {
+        if (!byName.has(rf.name)) byName.set(rf.name, []);
+        byName.get(rf.name).push(rf);
+      }
+
+      const toDelete = [];
+      for (const files of byName.values()) {
+        if (files.length <= 1) continue;
+        files.sort((a, b) => (a.createdTime || '').localeCompare(b.createdTime || ''));
+        // Keep the oldest (the original upload), delete the rest.
+        toDelete.push(...files.slice(1));
+      }
+
+      if (toDelete.length === 0) {
+        statusMsg.textContent = '重複はありませんでした';
+        dedupeBtn.disabled = false;
+        return;
+      }
+
+      const ok = confirm(`同じ名前のファイルが${toDelete.length}件見つかりました。古い方（1つ）を残して、重複分を削除します。よろしいですか？`);
+      if (!ok) {
+        statusMsg.textContent = '';
+        dedupeBtn.disabled = false;
+        return;
+      }
+
+      const deletedIds = new Set(toDelete.map(f => f.id));
+      for (const f of toDelete) {
+        await driveDeleteFile(f.id);
+      }
+
+      // Remove local photo records that pointed at the now-deleted duplicate files.
+      const localPhotos = await listPhotosForEntry(currentEntry.id);
+      for (const lp of localPhotos) {
+        if (lp.driveFileId && deletedIds.has(lp.driveFileId)) {
+          await deletePhotoDB(lp.id);
+        }
+      }
+
+      currentPhotos = await listPhotosForEntry(currentEntry.id);
+      currentEntry.photoCount = currentPhotos.length;
+      await putEntry(currentEntry);
+      renderPhotoGrid();
+      statusMsg.textContent = `${toDelete.length}件の重複を削除しました`;
+    } catch (e) {
+      statusMsg.textContent = `整理に失敗しました: ${e.message || e}`;
+    } finally {
+      dedupeBtn.disabled = false;
+    }
+  });
+
+  window.__debugConn = {
+    setDriveConnected, setToken: (t) => { driveAccessToken = t; },
+    addEntry, listEntries, addPhoto, listPhotosForEntry,
+    setCurrentEntry: async (id) => { currentEntry = await getEntry(id); currentPhotos = await listPhotosForEntry(id); },
+    getCurrentEntry: () => currentEntry,
+    getCurrentPhotos: () => currentPhotos
+  };
 
   // ---- init ----
   renderList();
