@@ -944,6 +944,17 @@
         } catch (e) {
           failedCount++;
         }
+      } else if (rf.createdTime) {
+        // Backfill: photos synced before ordering used Drive's actual
+        // upload time got createdAt set to whenever they happened to be
+        // pulled, which differs per device. Correct it now so already-
+        // synced photos also sort the same way everywhere.
+        const lp = localByDriveId.get(rf.id);
+        if (lp.createdAt !== rf.createdTime) {
+          lp.createdAt = rf.createdTime;
+          await putPhoto(lp);
+          changed = true;
+        }
       }
     }
 
