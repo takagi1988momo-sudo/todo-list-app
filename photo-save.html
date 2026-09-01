@@ -1143,8 +1143,12 @@
     renderPhotoGrid();
     showView('detail');
 
+    // TEMPORARY diagnostics: show the entry id / cached folder id / local
+    // photo count so mismatches between devices can be compared directly
+    // instead of guessed at.
+    statusMsg.textContent = `[診断] id末尾:${currentEntry.id.slice(-6)} folder:${currentEntry.driveFolderId ? currentEntry.driveFolderId.slice(-8) : 'なし'} local:${currentPhotos.length}枚`;
+
     if (driveAccessToken) {
-      statusMsg.textContent = '写真を同期中...';
       try {
         const { changed, failedCount } = await pullPhotosForEntry(currentEntry);
         if (changed && currentEntry) {
@@ -1153,7 +1157,8 @@
           await putEntry(currentEntry);
           renderPhotoGrid();
         }
-        statusMsg.textContent = failedCount > 0 ? `${failedCount}枚の写真の同期に失敗しました` : '';
+        statusMsg.textContent += ` → folder:${currentEntry.driveFolderId ? currentEntry.driveFolderId.slice(-8) : 'なし'} local:${currentPhotos.length}枚`;
+        if (failedCount > 0) statusMsg.textContent += ` / ${failedCount}枚失敗`;
       } catch (e) {
         if (isAuthError(e)) {
           disconnectDrive();
