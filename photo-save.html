@@ -708,7 +708,7 @@
 
   async function listFilesInFolder(folderId) {
     const query = `'${folderId}' in parents and trashed=false`;
-    const res = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`, { method: 'GET' });
+    const res = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,createdTime)`, { method: 'GET' });
     return res.files || [];
   }
 
@@ -907,7 +907,7 @@
             name: rf.name,
             type: blob.type,
             blob,
-            createdAt: new Date().toISOString(),
+            createdAt: rf.createdTime || new Date().toISOString(),
             driveFileId: rf.id
           });
           changed = true;
@@ -1171,7 +1171,11 @@
 
   function renderPhotoGrid() {
     grid.innerHTML = '';
-    currentPhotos.forEach(p => {
+    // Sort by the photo's actual timestamp (not local insertion order), so
+    // every device shows photos in the same order regardless of when each
+    // one happened to sync them down.
+    const sortedPhotos = [...currentPhotos].sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+    sortedPhotos.forEach(p => {
       const thumb = document.createElement('div');
       thumb.className = 'thumb';
 
