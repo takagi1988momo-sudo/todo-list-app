@@ -904,14 +904,54 @@
     return result.id;
   }
 
-  async function pullPhotosForEntry(entry) {
+  // Guards against overlapping pullPhotosForEntry calls for the same entry
+  // (e.g. opening the detail view and tapping 更新 in quick succession, or
+  // two tablets racing). Without this, two concurrent calls can each decide
+  // the same remote file is "not downloaded yet" and both create a local
+  // record for it -- leaving two local photos that point at one real Drive
+  // file. Deleting one later would then wrongly delete the shared file out
+  // from under the other.
+  const pullInFlight = new Map();
+  function pullPhotosForEntry(entry) {
+    if (pullInFlight.has(entry.id)) return pullInFlight.get(entry.id);
+    const p = pullPhotosForEntryInner(entry).finally(() => pullInFlight.delete(entry.id));
+    pullInFlight.set(entry.id, p);
+    return p;
+  }
+
+  async function pullPhotosForEntryInner(entry) {
     if (!driveAccessToken) return { changed: false, failedCount: 0 };
     const entryFolderId = await getEntryDriveFolderId(entry);
     const remoteFiles = await listFilesInFolder(entryFolderId);
-    const localPhotos = await listPhotosForEntry(entry.id);
-    const localByDriveId = new Map(localPhotos.filter(p => p.driveFileId).map(p => [p.driveFileId, p]));
+    let localPhotos = await listPhotosForEntry(entry.id);
     let changed = false;
     let failedCount = 0;
+
+    // Self-heal: merge local photo records that already point at the same
+    // Drive file (leftover from the race described above, or any other
+    // cause). Keep the oldest record and drop the rest -- without touching
+    // Drive, since they all share one real file.
+    {
+      const groups = new Map();
+      for (const lp of localPhotos) {
+        if (!lp.driveFileId) continue;
+        if (!groups.has(lp.driveFileId)) groups.set(lp.driveFileId, []);
+        groups.get(lp.driveFileId).push(lp);
+      }
+      const toDrop = new Set();
+      for (const group of groups.values()) {
+        if (group.length <= 1) continue;
+        group.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+        for (const dup of group.slice(1)) toDrop.add(dup.id);
+      }
+      if (toDrop.size > 0) {
+        for (const id of toDrop) await deletePhotoDB(id);
+        localPhotos = localPhotos.filter(lp => !toDrop.has(lp.id));
+        changed = true;
+      }
+    }
+
+    const localByDriveId = new Map(localPhotos.filter(p => p.driveFileId).map(p => [p.driveFileId, p]));
 
     // Retry uploading any local photo that never got a driveFileId (an
     // earlier upload attempt failed and was never retried). Without this,
@@ -1334,7 +1374,13 @@
     await putEntry(currentEntry);
     renderPhotoGrid();
     if (photo && photo.driveFileId && driveAccessToken) {
-      driveDeleteFile(photo.driveFileId);
+      // If another local photo record still points at the same Drive file
+      // (can happen from a leftover duplicate-record bug), don't delete the
+      // shared file out from under it -- just drop this local pointer.
+      const stillReferenced = currentPhotos.some(p => p.driveFileId === photo.driveFileId);
+      if (!stillReferenced) {
+        driveDeleteFile(photo.driveFileId);
+      }
     }
   }
 
