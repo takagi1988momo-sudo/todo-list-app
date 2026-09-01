@@ -895,6 +895,7 @@
     const localPhotos = await listPhotosForEntry(entry.id);
     const localByDriveId = new Map(localPhotos.filter(p => p.driveFileId).map(p => [p.driveFileId, p]));
     let changed = false;
+    let failedCount = 0;
 
     for (const rf of remoteFiles) {
       if (!localByDriveId.has(rf.id)) {
@@ -911,7 +912,7 @@
           });
           changed = true;
         } catch (e) {
-          // skip this file, try others
+          failedCount++;
         }
       }
     }
@@ -929,7 +930,7 @@
         }
       }
     }
-    return changed;
+    return { changed, failedCount };
   }
 
   async function syncWithDrive() {
@@ -947,23 +948,29 @@
       // so the list-screen refresh button brings in photos added on other
       // devices without having to open each company individually.
       const entries = (await listEntries()).filter(e => !e.deleted);
+      const photoErrors = [];
       for (let i = 0; i < entries.length; i++) {
         const entry = entries[i];
         driveSyncMsg.textContent = `写真を同期中... (${i + 1}/${entries.length})`;
         try {
-          const changed = await pullPhotosForEntry(entry);
+          const { changed, failedCount } = await pullPhotosForEntry(entry);
           if (changed) {
             const photos = await listPhotosForEntry(entry.id);
             entry.photoCount = photos.length;
             await putEntry(entry);
           }
+          if (failedCount > 0) {
+            photoErrors.push(`${entry.company}: ${failedCount}枚失敗`);
+          }
         } catch (e) {
           if (isAuthError(e)) throw e;
-          // skip this entry's photos on non-auth errors, keep going with the rest
+          photoErrors.push(`${entry.company}: ${e.message || e}`);
         }
       }
       await renderList();
-      driveSyncMsg.textContent = '更新しました';
+      driveSyncMsg.textContent = photoErrors.length > 0
+        ? `更新しましたが、一部の写真で失敗しました: ${photoErrors.join(' / ')}`
+        : '更新しました';
     } catch (err) {
       if (isAuthError(err)) {
         disconnectDrive();
@@ -1109,14 +1116,14 @@
     if (driveAccessToken) {
       statusMsg.textContent = '写真を同期中...';
       try {
-        const changed = await pullPhotosForEntry(currentEntry);
+        const { changed, failedCount } = await pullPhotosForEntry(currentEntry);
         if (changed && currentEntry) {
           currentPhotos = await listPhotosForEntry(entryId);
           currentEntry.photoCount = currentPhotos.length;
           await putEntry(currentEntry);
           renderPhotoGrid();
         }
-        statusMsg.textContent = '';
+        statusMsg.textContent = failedCount > 0 ? `${failedCount}枚の写真の同期に失敗しました` : '';
       } catch (e) {
         if (isAuthError(e)) {
           disconnectDrive();
@@ -1222,6 +1229,11 @@
           // upload failure is non-fatal; photo stays local-only
         }
       }
+      // uploadPhotoToDrive resolves (and locally caches) the entry's Drive
+      // folder id via getEntryDriveFolderId. Push it now so other devices
+      // learn the same folder id directly instead of relying solely on
+      // recomputing the same folder name independently.
+      pushEntriesToDrive();
     }
   }
 
