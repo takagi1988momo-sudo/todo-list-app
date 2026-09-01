@@ -889,13 +889,31 @@
   }
 
   async function pullPhotosForEntry(entry) {
-    if (!driveAccessToken) return false;
+    if (!driveAccessToken) return { changed: false, failedCount: 0 };
     const entryFolderId = await getEntryDriveFolderId(entry);
     const remoteFiles = await listFilesInFolder(entryFolderId);
     const localPhotos = await listPhotosForEntry(entry.id);
     const localByDriveId = new Map(localPhotos.filter(p => p.driveFileId).map(p => [p.driveFileId, p]));
     let changed = false;
     let failedCount = 0;
+
+    // Retry uploading any local photo that never got a driveFileId (an
+    // earlier upload attempt failed and was never retried). Without this,
+    // such photos stay counted locally forever without ever appearing in
+    // Drive, and without a driveFileId the pruning check below can't tell
+    // they're actually orphaned.
+    for (const lp of localPhotos) {
+      if (!lp.driveFileId) {
+        try {
+          const driveFileId = await uploadPhotoToDrive(lp, entry);
+          lp.driveFileId = driveFileId;
+          await putPhoto(lp);
+          localByDriveId.set(driveFileId, lp);
+        } catch (e) {
+          failedCount++;
+        }
+      }
+    }
 
     for (const rf of remoteFiles) {
       if (!localByDriveId.has(rf.id)) {
