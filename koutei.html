@@ -256,6 +256,9 @@ label.f input,label.f select{color:var(--fg);background:var(--surface-2);border:
       <label class="f">フィン抜きの時間 h<input id="f-fin" type="number" min="0" step="0.5" enterkeyhint="done"></label>
       <label class="f">拡管の時間 h<input id="f-kak" type="number" min="0" step="0.5" enterkeyhint="done"></label>
     </div>
+    <div class="row2">
+      <label class="f">溶接の時間 h<input id="f-wel" type="number" min="0" step="0.5" enterkeyhint="done"></label>
+    </div>
     <label class="f">この会社だけの残業 h（空なら全体の残業の値）<input id="f-ot" type="number" min="0" max="12" step="0.5" enterkeyhint="done"></label>
     <label class="f">置き場所<select id="f-team"></select></label>
     <label class="f">メモ<input id="f-memo" autocomplete="off" maxlength="120"></label>
@@ -364,7 +367,7 @@ function consume(cur,need,c,fn){
     var t=Math.min(need,cur.left);need-=t;cur.left-=t;fn(cur.d,t);
   }
 }
-function addUse(use,dn,cat,h){var k=ymOf(dn);var u=use[k]||(use[k]={asm:0,tmp:0,hdr:0,fin:0,kak:0,und:0,extra:0});u[cat]+=h;}
+function addUse(use,dn,cat,h){var k=ymOf(dn);var u=use[k]||(use[k]={asm:0,tmp:0,hdr:0,fin:0,kak:0,wel:0,und:0,extra:0});u[cat]+=h;}
 function schedule(list,c,cur,use){
   var c0=c;
   return list.map(function(job){
@@ -377,7 +380,7 @@ function schedule(list,c,cur,use){
       first=nextWork(ps,c);last=prevWork(pe,c);if(last<first)last=first;
       var wd=[],dd;for(dd=first;dd<=last;dd++){if(isWork(dd,c))wd.push(dd);}
       if(!wd.length)wd=[first];
-      [['hdr',job.hdrH],['tmp',job.tempH],['fin',job.finH],['kak',job.kakH],['asm',job.asmH]].forEach(function(sg){
+      [['hdr',job.hdrH],['tmp',job.tempH],['fin',job.finH],['kak',job.kakH],['wel',job.weldH],['asm',job.asmH]].forEach(function(sg){
         var need=+sg[1]||0;if(need<=0)return;
         wd.forEach(function(d){addUse(use,d,sg[0],need/wd.length);});
       });
@@ -393,7 +396,7 @@ function schedule(list,c,cur,use){
       if(first!=null){for(d2=first;d2<=last;d2++){if(isWork(d2,c))w2.push(d2);}}
       if(!w2.length)w2=[cc.d];
       if(cc!==cur&&cc.d>=cur.d){cur.left=cc.d>cur.d?cc.left:Math.min(cc.left,cur.left);cur.d=cc.d;}
-      [['hdr',job.hdrH],['tmp',job.tempH],['fin',job.finH],['kak',job.kakH]].forEach(function(sg){
+      [['hdr',job.hdrH],['tmp',job.tempH],['fin',job.finH],['kak',job.kakH],['wel',job.weldH]].forEach(function(sg){
         var need=+sg[1]||0;if(need<=0)return;
         w2.forEach(function(d){addUse(use,d,sg[0],need/w2.length);});
       });
@@ -416,12 +419,12 @@ function monthRows(c,use,lastDn,und){
     var first=Math.floor(Date.UTC(y,m,1)/DAY),next=Math.floor(Date.UTC(y,m+1,1)/DAY);
     var from=Math.max(first,d0),days=0,cap=0;
     for(var d=from;d<next;d++){if(isWork(d,c)){days++;cap+=dayCap(d,c);}}
-    var u=use[y+'-'+String(m+1).padStart(2,'0')]||{asm:0,tmp:0,hdr:0,fin:0,kak:0,und:0,extra:0};
+    var u=use[y+'-'+String(m+1).padStart(2,'0')]||{asm:0,tmp:0,hdr:0,fin:0,kak:0,wel:0,und:0,extra:0};
     cap+=(u.extra||0);
-    var free=Math.max(0,cap-u.asm-u.tmp-u.hdr-u.fin-u.kak),take=Math.min(free,left);left-=take;
-    var key=y+'-'+String(m+1).padStart(2,'0'),oth=(c.other&&c.other[key])||0,fin=u.fin||0,kak=u.kak||0;
-    var rest=cap-u.asm-u.tmp-u.hdr-take-fin-kak-oth;if(rest<0.0001)rest=0;
-    rows.push({y:y,m:m+1,key:key,days:days,cap:cap,asm:u.asm,tmp:u.tmp,hdr:u.hdr,und:take,fin:fin,kak:kak,oth:oth,rest:rest});
+    var free=Math.max(0,cap-u.asm-u.tmp-u.hdr-u.fin-u.kak-u.wel),take=Math.min(free,left);left-=take;
+    var key=y+'-'+String(m+1).padStart(2,'0'),oth=(c.other&&c.other[key])||0,fin=u.fin||0,kak=u.kak||0,wel=u.wel||0;
+    var rest=cap-u.asm-u.tmp-u.hdr-take-fin-kak-wel-oth;if(rest<0.0001)rest=0;
+    rows.push({y:y,m:m+1,key:key,days:days,cap:cap,asm:u.asm,tmp:u.tmp,hdr:u.hdr,und:take,fin:fin,kak:kak,wel:wel,oth:oth,rest:rest});
     m++;if(m>11){m=0;y++;}guard++;
   }
   return rows;
@@ -467,7 +470,7 @@ function normJob(id,d){
   d=d||{};
   function n(x){return isFinite(x)&&+x>=0?+x:0;}
   return {id:id,company:String(d.company||''),model:String(d.model||''),qty:isFinite(d.qty)&&+d.qty>0?+d.qty:1,ship:String(d.ship||''),
-    totalH:n(d.totalH),asmH:n(d.asmH),tempH:n(d.tempH),hdrH:n(d.hdrH),finH:n(d.finH),kakH:n(d.kakH),team:String(d.team||''),otH:(d.otH===''||d.otH==null||!isFinite(d.otH)||+d.otH<0)?'':Math.min(12,+d.otH),shipMode:(d.shipMode==='jun'||d.shipMode==='tbd')?d.shipMode:'date',shipYm:/^\d{4}-\d{2}$/.test(d.shipYm||'')?d.shipYm:'',shipPart:(d.shipPart==='中'||d.shipPart==='下')?d.shipPart:'上',planStart:toDn(d.planStart)!=null?d.planStart:'',planEnd:toDn(d.planEnd)!=null?d.planEnd:'',
+    totalH:n(d.totalH),asmH:n(d.asmH),tempH:n(d.tempH),hdrH:n(d.hdrH),finH:n(d.finH),kakH:n(d.kakH),weldH:n(d.weldH),team:String(d.team||''),otH:(d.otH===''||d.otH==null||!isFinite(d.otH)||+d.otH<0)?'':Math.min(12,+d.otH),shipMode:(d.shipMode==='jun'||d.shipMode==='tbd')?d.shipMode:'date',shipYm:/^\d{4}-\d{2}$/.test(d.shipYm||'')?d.shipYm:'',shipPart:(d.shipPart==='中'||d.shipPart==='下')?d.shipPart:'上',planStart:toDn(d.planStart)!=null?d.planStart:'',planEnd:toDn(d.planEnd)!=null?d.planEnd:'',
     pos:isFinite(d.pos)?+d.pos:0,memo:String(d.memo||''),sample:!!d.sample};
 }
 function laneById(id){return state.settings.lanes.filter(function(l){return l.id===id;})[0]||null;}
@@ -496,7 +499,7 @@ function saveLocal(){try{localStorage.setItem('koutei-v1',JSON.stringify({settin
 function loadLocal(){
   try{var raw=localStorage.getItem('koutei-v1');if(raw){var o=JSON.parse(raw);state.settings=normSettings(o.settings);state.jobs=(o.jobs||[]).map(function(j){return normJob(j.id||genId(),j);});}}catch(e){}
 }
-function jobData(j){return {company:j.company,model:j.model,qty:j.qty,ship:j.ship,totalH:j.totalH,asmH:j.asmH,tempH:j.tempH,hdrH:j.hdrH,finH:j.finH||0,kakH:j.kakH||0,team:j.team,pos:j.pos,memo:j.memo,sample:!!j.sample,shipMode:j.shipMode||'date',shipYm:j.shipYm||'',shipPart:j.shipPart||'上',planStart:j.planStart||'',planEnd:j.planEnd||'',otH:(j.otH===''||j.otH==null)?'':j.otH};}
+function jobData(j){return {company:j.company,model:j.model,qty:j.qty,ship:j.ship,totalH:j.totalH,asmH:j.asmH,tempH:j.tempH,hdrH:j.hdrH,finH:j.finH||0,kakH:j.kakH||0,weldH:j.weldH||0,team:j.team,pos:j.pos,memo:j.memo,sample:!!j.sample,shipMode:j.shipMode||'date',shipYm:j.shipYm||'',shipPart:j.shipPart||'上',planStart:j.planStart||'',planEnd:j.planEnd||'',otH:(j.otH===''||j.otH==null)?'':j.otH};}
 function persistJob(j){
   if(!db){saveLocal();return;}
   var data=jobData(j);
@@ -534,7 +537,8 @@ function jobHTML(r,i){
     (j.tempH>0?'<div class="hl"><span class="k">仮組</span><span class="v">'+num(j.tempH)+'h</span></div>':'')+
     (j.hdrH>0?'<div class="hl"><span class="k">ヘッダー</span><span class="v">'+num(j.hdrH)+'h</span></div>':'')+
     (j.finH>0?'<div class="hl"><span class="k">フィン抜き</span><span class="v">'+num(j.finH)+'h</span></div>':'')+
-    (j.kakH>0?'<div class="hl"><span class="k">拡管</span><span class="v">'+num(j.kakH)+'h</span></div>':'');
+    (j.kakH>0?'<div class="hl"><span class="k">拡管</span><span class="v">'+num(j.kakH)+'h</span></div>':'')+
+    (j.weldH>0?'<div class="hl"><span class="k">溶接</span><span class="v">'+num(j.weldH)+'h</span></div>':'');
   var dates;
   if(r.days>0&&r.start!=null){
     dates='<div class="dl"><span class="tg kai">開</span><span class="d">'+fmt(r.start)+'</span></div>'+
@@ -581,12 +585,12 @@ function monthsHTML(rows,s,tp){
     var label=((i===0||r.m===1)?r.y+'年':'')+r.m+'月';
     function oin(kind,v,nm){return '<td><input class="oin" type="number" min="0" step="0.5" inputmode="decimal" enterkeyhint="done" data-kind="'+kind+'" data-month="'+r.key+'" value="'+(v>0?num(v):'')+'" placeholder="0" aria-label="'+label+'の'+nm+'の時間"></td>';}
     return '<tr><td>'+label+'</td><td>'+r.days+'日</td><td>'+hh(r.cap)+'h</td>'+c(r.asm)+c(r.tmp)+c(r.hdr)+
-      c(r.fin)+c(r.kak)+oin('other',r.oth,'その他')+'<td class="rest'+(r.rest<0.05?' zero':'')+'">'+(r.rest<0.05?'0h':hh(r.rest)+'h')+'</td></tr>';
+      c(r.fin)+c(r.kak)+c(r.wel)+oin('other',r.oth,'その他')+'<td class="rest'+(r.rest<0.05?' zero':'')+'">'+(r.rest<0.05?'0h':hh(r.rest)+'h')+'</td></tr>';
   }).join('');
   var perDay=pday(tp,cfgOf());
   return '<div class="panel-head"><h2>月ごとの時間</h2><div class="stepper box"><span class="st-l">作業者</span><button class="sbtn" data-act="wk-" aria-label="作業者を減らす" type="button">−</button><span class="sval">'+num(s.workers)+'人</span><button class="sbtn" data-act="wk+" aria-label="作業者を増やす" type="button">＋</button></div></div>'+
-    '<div class="mwrap"><table class="mt"><thead><tr><th>月</th><th>稼働日</th><th>合計</th><th>組立</th><th>仮組</th><th>ヘッダー・分流器</th><th>フィン抜き</th><th>拡管</th><th>その他 h</th><th>残り</th></tr></thead><tbody>'+body+'</tbody></table></div>'+
-    '<p class="hint">作業者は '+num(tp)+'人。平日1日の時間 ＝ '+num(tp)+'人 × '+num(s.reg)+'h ＝ '+num(tp*s.reg)+'h。残業を足すと、残業する '+num(Math.min(s.otp,tp))+'人の分だけプラスします'+(s.ot>0?'（残業 '+num(s.ot)+'h × '+num(Math.min(s.otp,tp))+'人 ＝ '+num(Math.min(s.otp,tp)*s.ot)+'h。1日 '+num(perDay)+'h）':'（いまは残業なし）')+'。土曜は '+num(s.sat)+'人、祝日は '+num(s.hol)+'人で数えます（1人 '+num(s.reg)+'h。土曜・祝日は残業を足しません。0人は休み）。最初の月は開始日からの分です。「その他」は案件に入らない時間（片付けなど）を月ごとに自分で入れます。残り ＝ 合計 − 組立 − 仮組 − ヘッダー・分流器 − フィン抜き − 拡管 − その他。</p>';
+    '<div class="mwrap"><table class="mt"><thead><tr><th>月</th><th>稼働日</th><th>合計</th><th>組立</th><th>仮組</th><th>ヘッダー・分流器</th><th>フィン抜き</th><th>拡管</th><th>溶接</th><th>その他 h</th><th>残り</th></tr></thead><tbody>'+body+'</tbody></table></div>'+
+    '<p class="hint">作業者は '+num(tp)+'人。平日1日の時間 ＝ '+num(tp)+'人 × '+num(s.reg)+'h ＝ '+num(tp*s.reg)+'h。残業を足すと、残業する '+num(Math.min(s.otp,tp))+'人の分だけプラスします'+(s.ot>0?'（残業 '+num(s.ot)+'h × '+num(Math.min(s.otp,tp))+'人 ＝ '+num(Math.min(s.otp,tp)*s.ot)+'h。1日 '+num(perDay)+'h）':'（いまは残業なし）')+'。土曜は '+num(s.sat)+'人、祝日は '+num(s.hol)+'人で数えます（1人 '+num(s.reg)+'h。土曜・祝日は残業を足しません。0人は休み）。最初の月は開始日からの分です。「その他」は案件に入らない時間（片付けなど）を月ごとに自分で入れます。残り ＝ 合計 − 組立 − 仮組 − ヘッダー・分流器 − フィン抜き − 拡管 − 溶接 − その他。</p>';
 }
 function render(){
   if(dragging){pendingRender=true;return;}
@@ -698,7 +702,7 @@ function openJob(id,team,focusMemo){
   $('jobTitle').textContent=j?'案件を編集':'案件を追加';
   $('f-company').value=j?j.company:'';$('f-model').value=j?j.model:'';$('f-qty').value=j?j.qty:1;
   $('f-ship').value=j?j.ship:'';$('f-ym').value=j?j.shipYm:'';$('f-smode').value=j?(j.shipMode==='jun'?(j.shipPart||'上'):(j.shipMode||'date')):'date';$('f-ot').value=(j&&j.otH!=='')?j.otH:'';$('f-pstart').value=j?j.planStart:'';$('f-pend').value=j?j.planEnd:'';syncShip();$('f-total').value=j?j.totalH:'';$('f-asm').value=j?j.asmH:'';
-  $('f-tmp').value=j?j.tempH:'';$('f-hdr').value=j?j.hdrH:'';$('f-fin').value=j&&j.finH?j.finH:'';$('f-kak').value=j&&j.kakH?j.kakH:'';
+  $('f-tmp').value=j?j.tempH:'';$('f-hdr').value=j?j.hdrH:'';$('f-fin').value=j&&j.finH?j.finH:'';$('f-kak').value=j&&j.kakH?j.kakH:'';$('f-wel').value=j&&j.weldH?j.weldH:'';
   $('f-team').value=j?j.team:(team||state.settings.lanes[0].id);$('f-memo').value=j?j.memo:'';
   $('jobErr').textContent='';
   var del=$('f-del');del.hidden=!j;del.dataset.armed='0';del.textContent='削除';
@@ -721,7 +725,7 @@ function numOf(id){var v=$(id).value.trim();if(v==='')return 0;var x=parseFloat(
 $('jobForm').addEventListener('submit',function(e){
   e.preventDefault();
   var company=$('f-company').value.trim(),ship=$('f-ship').value;
-  var total=numOf('f-total'),asm=numOf('f-asm'),tmp=numOf('f-tmp'),hdr=numOf('f-hdr'),fin=numOf('f-fin'),kak=numOf('f-kak');
+  var total=numOf('f-total'),asm=numOf('f-asm'),tmp=numOf('f-tmp'),hdr=numOf('f-hdr'),fin=numOf('f-fin'),kak=numOf('f-kak'),wel=numOf('f-wel');
   var team=$('f-team').value,qty=parseFloat($('f-qty').value);
   if(!company){$('jobErr').textContent='会社名を入れてください。';return;}
   var sm=$('f-smode').value,ym=$('f-ym').value,pst=$('f-pstart').value,pen=$('f-pend').value;
@@ -731,14 +735,14 @@ $('jobForm').addEventListener('submit',function(e){
   var pmx=planMax();
   if(pmx!=null&&((pen&&toDn(pen)>pmx)||(pst&&toDn(pst)>pmx))){$('jobErr').textContent='開始日・完了日は、'+fmt(pmx)+'までです（出荷日の'+state.settings.buffer+'稼働日前）。';return;}
   if(pst&&pen&&toDn(pen)<toDn(pst)){$('jobErr').textContent='完了日は開始日より後にしてください。';return;}
-  if([total,asm,tmp,hdr,fin,kak].some(function(x){return !(x>=0);})){$('jobErr').textContent='時間は0以上の数字で入れてください。';return;}
+  if([total,asm,tmp,hdr,fin,kak,wel].some(function(x){return !(x>=0);})){$('jobErr').textContent='時間は0以上の数字で入れてください。';return;}
   var j=editingId?byId(editingId):null;
   if(!j){var list=jobsOf(team);j={id:genId(),pos:list.length?list[list.length-1].pos+1:1};state.jobs.push(j);}
   else if(j.team!==team){var l2=jobsOf(team);j.pos=l2.length?l2[l2.length-1].pos+1:1;}
   var ov=$('f-ot').value.trim();j.otH=(ov===''||!isFinite(parseFloat(ov))||parseFloat(ov)<0)?'':Math.min(12,parseFloat(ov));
   j.shipMode=(sm==='date'||sm==='tbd')?sm:'jun';j.shipPart=(sm==='中'||sm==='下')?sm:'上';j.shipYm=ym;j.planStart=pst;j.planEnd=pen;
   j.company=company;j.model=$('f-model').value.trim();j.qty=isFinite(qty)&&qty>0?qty:1;j.ship=sm==='date'?ship:'';
-  j.totalH=total;j.asmH=asm;j.tempH=tmp;j.hdrH=hdr;j.finH=fin;j.kakH=kak;j.team=team;j.memo=$('f-memo').value.trim();j.sample=false;
+  j.totalH=total;j.asmH=asm;j.tempH=tmp;j.hdrH=hdr;j.finH=fin;j.kakH=kak;j.weldH=wel;j.team=team;j.memo=$('f-memo').value.trim();j.sample=false;
   persistJob(j);$('jobDlg').close();render();
 });
 $('f-cancel').addEventListener('click',function(){$('jobDlg').close();});
@@ -783,7 +787,7 @@ var FAM='"IBM Plex Sans JP","Hiragino Sans","Yu Gothic",Meiryo,"Noto Sans CJK JP
 var pdfCanvases=[],pdfLand=true;
 function ensureFonts(){
   if(!document.fonts||!document.fonts.load)return Promise.resolve();
-  var sample='工程管理表出荷全組仮ヘッダー分流器開完日遅れ余裕月稼働合計残り未定0123456789ギリフィン抜き拡管その他'+state.jobs.map(function(j){return j.company+j.model;}).join('');
+  var sample='工程管理表出荷全組仮ヘッダー分流器開完日遅れ余裕月稼働合計残り未定0123456789ギリフィン抜き拡管溶接その他'+state.jobs.map(function(j){return j.company+j.model;}).join('');
   var all=Promise.all(['400','500','600','700'].map(function(w){return document.fonts.load(w+' 16px "IBM Plex Sans JP"',sample);}));
   return Promise.race([all,new Promise(function(r){setTimeout(r,2500);})]).catch(function(){});
 }
@@ -810,14 +814,14 @@ function buildSheets(opt){
   function hm(x){return hh(x)+'h';}
 
   function monthTable(x0,y0,w){
-    var rows=m.months,fr8=[0.12,0.07,0.10,0.09,0.09,0.14,0.10,0.09,0.09,0.11],hd=['月','稼働日','合計','組立','仮組','ヘッダー・分流器','フィン抜き','拡管','その他','残り'];
+    var rows=m.months,fr8=[0.11,0.06,0.09,0.08,0.08,0.13,0.09,0.08,0.08,0.09,0.11],hd=['月','稼働日','合計','組立','仮組','ヘッダー・分流器','フィン抜き','拡管','溶接','その他','残り'];
     var xs=[x0],i;for(i=0;i<fr8.length;i++)xs.push(xs[i]+fr8[i]*w);
     fr(x0,y0,w,5.5,'#e6e9ec');
     hd.forEach(function(t,k){tx(t,k===0?xs[k]+1.2:xs[k+1]-1.2,y0+3.9,7,'600','#333',k===0?'left':'right');});
     var yy=y0+5.5;
     rows.forEach(function(r,idx){
-      var vals=[((idx===0||r.m===1)?r.y+'年':'')+r.m+'月',r.days+'日',hm(r.cap),r.asm>0.05?hm(r.asm):'—',r.tmp>0.05?hm(r.tmp):'—',r.hdr>0.05?hm(r.hdr):'—',r.fin>0.05?hm(r.fin):'—',r.kak>0.05?hm(r.kak):'—',r.oth>0.05?hm(r.oth):'—',r.rest>0.05?hm(r.rest):'0h'];
-      vals.forEach(function(t,k){tx(t,k===0?xs[k]+1.2:xs[k+1]-1.2,yy+3.6,8.5,(k===0||k===9)?'700':'500','#111',k===0?'left':'right');});
+      var vals=[((idx===0||r.m===1)?r.y+'年':'')+r.m+'月',r.days+'日',hm(r.cap),r.asm>0.05?hm(r.asm):'—',r.tmp>0.05?hm(r.tmp):'—',r.hdr>0.05?hm(r.hdr):'—',r.fin>0.05?hm(r.fin):'—',r.kak>0.05?hm(r.kak):'—',r.wel>0.05?hm(r.wel):'—',r.oth>0.05?hm(r.oth):'—',r.rest>0.05?hm(r.rest):'0h'];
+      vals.forEach(function(t,k){tx(t,k===0?xs[k]+1.2:xs[k+1]-1.2,yy+3.6,8.5,(k===0||k===10)?'700':'500','#111',k===0?'left':'right');});
       yy+=5;ln(x0,yy,x0+w,yy,'#c9ced3',0.15);
     });
     return 5.5+rows.length*5;
@@ -842,7 +846,7 @@ function buildSheets(opt){
     else if(r.status==='ok'){lab='余裕'+r.n+'日';col='#17794a';}
     if(lab)tx(lab,x+w-1.8,yy+5,8.5,'700',col,'right');
     tx(j.model+(j.qty?'  ×'+num(j.qty)+'台':''),x+6,yy+9.6,8.5,'500','#222','left',w-8);
-    var ex=[];if(j.tempH>0)ex.push('仮組 '+hm(j.tempH));if(j.hdrH>0)ex.push('ヘッダー '+hm(j.hdrH));if(j.finH>0)ex.push('フィン抜き '+hm(j.finH));if(j.kakH>0)ex.push('拡管 '+hm(j.kakH));
+    var ex=[];if(j.tempH>0)ex.push('仮組 '+hm(j.tempH));if(j.hdrH>0)ex.push('ヘッダー '+hm(j.hdrH));if(j.finH>0)ex.push('フィン抜き '+hm(j.finH));if(j.kakH>0)ex.push('拡管 '+hm(j.kakH));if(j.weldH>0)ex.push('溶接 '+hm(j.weldH));
     if(narrow){
       tx('出荷',x+1.8,yy+14.6,6.5,'500','#555');
       tx(shipLabel(j),x+7.6,yy+15.2,12,'700','#000','left',w-9.4);
@@ -886,7 +890,7 @@ function buildSheets(opt){
   var now=new Date();
   tx('出力日 '+now.getFullYear()+'/'+(now.getMonth()+1)+'/'+now.getDate(),MG,MG+24,8.5,'400','#666');
   var mh;
-  if(land){var mw=150;mh=monthTable(MG+CW-mw,MG,mw);y=MG+Math.max(26,mh)+5;}
+  if(land){var mw=165;mh=monthTable(MG+CW-mw,MG,mw);y=MG+Math.max(26,mh)+5;}
   else{mh=monthTable(MG,MG+28,CW);y=MG+28+mh+5;}
   var shown=m.lanes;
   var groupN=4,GAP=2.5,gi,gk;
