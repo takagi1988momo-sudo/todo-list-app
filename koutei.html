@@ -415,16 +415,16 @@ function monthRows(c,use,lastDn,und){
     var u=use[y+'-'+String(m+1).padStart(2,'0')]||{asm:0,tmp:0,hdr:0,und:0,extra:0};
     cap+=(u.extra||0);
     var free=Math.max(0,cap-u.asm-u.tmp-u.hdr),take=Math.min(free,left);left-=take;
-    var key=y+'-'+String(m+1).padStart(2,'0'),oth=(c.other&&c.other[key])||0;
-    var rest=cap-u.asm-u.tmp-u.hdr-take-oth;if(rest<0.0001)rest=0;
-    rows.push({y:y,m:m+1,key:key,days:days,cap:cap,asm:u.asm,tmp:u.tmp,hdr:u.hdr,und:take,oth:oth,rest:rest});
+    var key=y+'-'+String(m+1).padStart(2,'0'),oth=(c.other&&c.other[key])||0,fin=(c.fin&&c.fin[key])||0,kak=(c.kak&&c.kak[key])||0;
+    var rest=cap-u.asm-u.tmp-u.hdr-take-fin-kak-oth;if(rest<0.0001)rest=0;
+    rows.push({y:y,m:m+1,key:key,days:days,cap:cap,asm:u.asm,tmp:u.tmp,hdr:u.hdr,und:take,fin:fin,kak:kak,oth:oth,rest:rest});
     m++;if(m>11){m=0;y++;}guard++;
   }
   return rows;
 }
 //#logic-end
 
-var DEF={start:'2027-01-05',reg:7.5,ot:0,sat:2,hol:2,workers:6.5,otp:4,other:{},buffer:1,deduct:true,off:[],lanes:[{id:'L',name:'A',people:2},{id:'M',name:'B',people:2},{id:'R',name:'C',people:2.5}]};
+var DEF={start:'2027-01-05',reg:7.5,ot:0,sat:2,hol:2,workers:6.5,otp:4,other:{},fin:{},kak:{},buffer:1,deduct:true,off:[],lanes:[{id:'L',name:'A',people:2},{id:'M',name:'B',people:2},{id:'R',name:'C',people:2.5}]};
 function clone(o){return JSON.parse(JSON.stringify(o));}
 var state={settings:clone(DEF),jobs:[],mode:'pending',loaded:false,slow:false,failed:false,filter:null};
 var db=null,dl=null,model=null,dragging=false,dragId=null,pendingRender=false,settingsDirty=false,settingsTimer=null,toastTimer=null;
@@ -442,7 +442,7 @@ function normSettings(r){
   if(isFinite(r.reg)&&+r.reg>0)s.reg=Math.min(24,+r.reg);
   if(isFinite(r.ot))s.ot=Math.max(0,Math.min(8,+r.ot));
   if(isFinite(r.hol))s.hol=Math.max(0,Math.min(30,Math.round(+r.hol*2)/2));
-  if(r.other&&typeof r.other==='object'){Object.keys(r.other).forEach(function(k){var v=+r.other[k];if(/^\d{4}-\d{2}$/.test(k)&&isFinite(v)&&v>0)s.other[k]=Math.min(5000,Math.round(v*2)/2);});}
+  ['other','fin','kak'].forEach(function(f){if(r[f]&&typeof r[f]==='object'){Object.keys(r[f]).forEach(function(k){var v=+r[f][k];if(/^\d{4}-\d{2}$/.test(k)&&isFinite(v)&&v>0)s[f][k]=Math.min(5000,Math.round(v*2)/2);});}});
   s.otp=(isFinite(r.otp)&&+r.otp>=0)?Math.min(60,Math.round(+r.otp*2)/2):s.otp;
   if(isFinite(r.workers)&&+r.workers>=0.5)s.workers=Math.min(60,Math.round(+r.workers*2)/2);
   s.sat=isFinite(r.sat)?Math.max(0,Math.min(30,Math.round(+r.sat*2)/2)):s.hol;
@@ -475,7 +475,7 @@ function fixOrphans(){
     if(ids.indexOf(j.team)<0){var l=jobsOf(first);j.team=first;j.pos=l.length?l[l.length-1].pos+1:1;persistJob(j);}
   });
 }
-function cfgOf(){var s=state.settings;return {start:toDn(s.start),reg:s.reg,ot:s.ot,otp:s.otp,other:s.other,sat:s.sat,hol:s.hol,people:s.workers,laneSum:totalPeople(),buffer:s.buffer,deduct:false,off:new Set(s.off)};}
+function cfgOf(){var s=state.settings;return {start:toDn(s.start),reg:s.reg,ot:s.ot,otp:s.otp,other:s.other,fin:s.fin,kak:s.kak,sat:s.sat,hol:s.hol,people:s.workers,laneSum:totalPeople(),buffer:s.buffer,deduct:false,off:new Set(s.off)};}
 function laneCfg(c,p){var o={},k;for(k in c)o[k]=c[k];o.people=p;o.otp=c.laneSum>0?c.otp*p/c.laneSum:0;o.hol=c.laneSum>0?c.hol*p/c.laneSum:0;o.sat=c.laneSum>0?c.sat*p/c.laneSum:0;return o;}
 function laneTitle(l,i){return (l.name?l.name+'　':'')+num(l.people)+'人';}
 function teamLabel(id){var l=laneById(id),i=state.settings.lanes.indexOf(l);return l?(i+1)+'番目の列　'+laneTitle(l):'';}
@@ -573,13 +573,14 @@ function monthsHTML(rows,s,tp){
   function c(v,cls){return '<td class="'+(v<0.05?'zero ':'')+(cls||'')+'">'+(v<0.05?'—':hh(v)+'h')+'</td>';}
   var body=rows.map(function(r,i){
     var label=((i===0||r.m===1)?r.y+'年':'')+r.m+'月';
+    function oin(kind,v,nm){return '<td><input class="oin" type="number" min="0" step="0.5" inputmode="decimal" enterkeyhint="done" data-kind="'+kind+'" data-month="'+r.key+'" value="'+(v>0?num(v):'')+'" placeholder="0" aria-label="'+label+'の'+nm+'の時間"></td>';}
     return '<tr><td>'+label+'</td><td>'+r.days+'日</td><td>'+hh(r.cap)+'h</td>'+c(r.asm)+c(r.tmp)+c(r.hdr)+
-      '<td><input class="oin" type="number" min="0" step="0.5" inputmode="decimal" data-month="'+r.key+'" value="'+(r.oth>0?num(r.oth):'')+'" placeholder="0" aria-label="'+label+'のその他の時間"></td><td class="rest'+(r.rest<0.05?' zero':'')+'">'+(r.rest<0.05?'0h':hh(r.rest)+'h')+'</td></tr>';
+      oin('fin',r.fin,'フィン抜き')+oin('kak',r.kak,'拡管')+oin('other',r.oth,'その他')+'<td class="rest'+(r.rest<0.05?' zero':'')+'">'+(r.rest<0.05?'0h':hh(r.rest)+'h')+'</td></tr>';
   }).join('');
   var perDay=pday(tp,cfgOf());
   return '<div class="panel-head"><h2>月ごとの時間</h2><div class="stepper box"><span class="st-l">作業者</span><button class="sbtn" data-act="wk-" aria-label="作業者を減らす" type="button">−</button><span class="sval">'+num(s.workers)+'人</span><button class="sbtn" data-act="wk+" aria-label="作業者を増やす" type="button">＋</button></div></div>'+
-    '<div class="mwrap"><table class="mt"><thead><tr><th>月</th><th>稼働日</th><th>合計</th><th>組立</th><th>仮組</th><th>ヘッダー・分流器</th><th>その他 h</th><th>残り</th></tr></thead><tbody>'+body+'</tbody></table></div>'+
-    '<p class="hint">作業者は '+num(tp)+'人。平日1日の時間 ＝ '+num(tp)+'人 × '+num(s.reg)+'h ＝ '+num(tp*s.reg)+'h。残業を足すと、残業する '+num(Math.min(s.otp,tp))+'人の分だけプラスします'+(s.ot>0?'（残業 '+num(s.ot)+'h × '+num(Math.min(s.otp,tp))+'人 ＝ '+num(Math.min(s.otp,tp)*s.ot)+'h。1日 '+num(perDay)+'h）':'（いまは残業なし）')+'。土曜は '+num(s.sat)+'人、祝日は '+num(s.hol)+'人で数えます（1人 '+num(s.reg)+'h。土曜・祝日は残業を足しません。0人は休み）。最初の月は開始日からの分です。「その他」は案件に入らない時間（片付けなど）を月ごとに自分で入れます。残り ＝ 合計 − 組立 − 仮組 − ヘッダー・分流器 − その他。</p>';
+    '<div class="mwrap"><table class="mt"><thead><tr><th>月</th><th>稼働日</th><th>合計</th><th>組立</th><th>仮組</th><th>ヘッダー・分流器</th><th>フィン抜き h</th><th>拡管 h</th><th>その他 h</th><th>残り</th></tr></thead><tbody>'+body+'</tbody></table></div>'+
+    '<p class="hint">作業者は '+num(tp)+'人。平日1日の時間 ＝ '+num(tp)+'人 × '+num(s.reg)+'h ＝ '+num(tp*s.reg)+'h。残業を足すと、残業する '+num(Math.min(s.otp,tp))+'人の分だけプラスします'+(s.ot>0?'（残業 '+num(s.ot)+'h × '+num(Math.min(s.otp,tp))+'人 ＝ '+num(Math.min(s.otp,tp)*s.ot)+'h。1日 '+num(perDay)+'h）':'（いまは残業なし）')+'。土曜は '+num(s.sat)+'人、祝日は '+num(s.hol)+'人で数えます（1人 '+num(s.reg)+'h。土曜・祝日は残業を足しません。0人は休み）。最初の月は開始日からの分です。「フィン抜き」「拡管」「その他」は、月ごとに自分で時間を入れます（「その他」は片付けなど案件に入らない時間）。残り ＝ 合計 − 組立 − 仮組 − ヘッダー・分流器 − フィン抜き − 拡管 − その他。</p>';
 }
 function render(){
   if(dragging){pendingRender=true;return;}
@@ -776,7 +777,7 @@ var FAM='"IBM Plex Sans JP","Hiragino Sans","Yu Gothic",Meiryo,"Noto Sans CJK JP
 var pdfCanvases=[],pdfLand=true;
 function ensureFonts(){
   if(!document.fonts||!document.fonts.load)return Promise.resolve();
-  var sample='工程管理表出荷全組仮ヘッダー分流器開完日遅れ余裕月稼働合計残り未定0123456789ギリ'+state.jobs.map(function(j){return j.company+j.model;}).join('');
+  var sample='工程管理表出荷全組仮ヘッダー分流器開完日遅れ余裕月稼働合計残り未定0123456789ギリフィン抜き拡管その他'+state.jobs.map(function(j){return j.company+j.model;}).join('');
   var all=Promise.all(['400','500','600','700'].map(function(w){return document.fonts.load(w+' 16px "IBM Plex Sans JP"',sample);}));
   return Promise.race([all,new Promise(function(r){setTimeout(r,2500);})]).catch(function(){});
 }
@@ -803,14 +804,14 @@ function buildSheets(opt){
   function hm(x){return hh(x)+'h';}
 
   function monthTable(x0,y0,w){
-    var rows=m.months,fr8=[0.14,0.09,0.13,0.11,0.10,0.19,0.10,0.14],hd=['月','稼働日','合計','組立','仮組','ヘッダー・分流器','その他','残り'];
+    var rows=m.months,fr8=[0.12,0.07,0.10,0.09,0.09,0.14,0.10,0.09,0.09,0.11],hd=['月','稼働日','合計','組立','仮組','ヘッダー・分流器','フィン抜き','拡管','その他','残り'];
     var xs=[x0],i;for(i=0;i<fr8.length;i++)xs.push(xs[i]+fr8[i]*w);
     fr(x0,y0,w,5.5,'#e6e9ec');
-    hd.forEach(function(t,k){tx(t,k===0?xs[k]+1.2:xs[k+1]-1.2,y0+3.9,8,'600','#333',k===0?'left':'right');});
+    hd.forEach(function(t,k){tx(t,k===0?xs[k]+1.2:xs[k+1]-1.2,y0+3.9,7,'600','#333',k===0?'left':'right');});
     var yy=y0+5.5;
     rows.forEach(function(r,idx){
-      var vals=[((idx===0||r.m===1)?r.y+'年':'')+r.m+'月',r.days+'日',hm(r.cap),r.asm>0.05?hm(r.asm):'—',r.tmp>0.05?hm(r.tmp):'—',r.hdr>0.05?hm(r.hdr):'—',r.oth>0.05?hm(r.oth):'—',r.rest>0.05?hm(r.rest):'0h'];
-      vals.forEach(function(t,k){tx(t,k===0?xs[k]+1.2:xs[k+1]-1.2,yy+3.6,8.5,(k===0||k===7)?'700':'500','#111',k===0?'left':'right');});
+      var vals=[((idx===0||r.m===1)?r.y+'年':'')+r.m+'月',r.days+'日',hm(r.cap),r.asm>0.05?hm(r.asm):'—',r.tmp>0.05?hm(r.tmp):'—',r.hdr>0.05?hm(r.hdr):'—',r.fin>0.05?hm(r.fin):'—',r.kak>0.05?hm(r.kak):'—',r.oth>0.05?hm(r.oth):'—',r.rest>0.05?hm(r.rest):'0h'];
+      vals.forEach(function(t,k){tx(t,k===0?xs[k]+1.2:xs[k+1]-1.2,yy+3.6,8.5,(k===0||k===9)?'700':'500','#111',k===0?'left':'right');});
       yy+=5;ln(x0,yy,x0+w,yy,'#c9ced3',0.15);
     });
     return 5.5+rows.length*5;
@@ -977,7 +978,7 @@ $('cfmYes').addEventListener('click',function(){var f=cfmCb;cfmCb=null;$('cfmDlg
 document.addEventListener('change',function(e){
   var el=e.target;
   if(el&&el.classList&&el.classList.contains('oin')){
-    var v=parseFloat(el.value),k=el.dataset.month,o=state.settings.other;
+    var v=parseFloat(el.value),k=el.dataset.month,f=el.dataset.kind||'other',o=state.settings[f]||(state.settings[f]={});
     if(isFinite(v)&&v>0)o[k]=Math.min(5000,Math.round(v*2)/2);else delete o[k];
     saveSettingsSoon();render();return;
   }
