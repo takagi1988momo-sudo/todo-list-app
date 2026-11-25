@@ -186,6 +186,8 @@ label.f input,label.f select{color:var(--fg);background:var(--surface-2);border:
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .dlg-btns{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 .dlg-btns .left{margin-right:auto}
+.sumnote{margin:0;font-size:13.5px;font-weight:600;padding:6px 10px;border-radius:6px}.sumnote:empty{display:none}.sumnote.ok{color:var(--ok);background:var(--ok-bg)}.sumnote.bad{color:var(--bad);background:var(--bad-bg)}
+.sumwarn{grid-column:1/-1;font-size:12.5px;font-weight:600;color:var(--bad);background:var(--bad-bg);padding:2px 8px;border-radius:6px;justify-self:start}
 .err{margin:0;color:var(--bad);font-size:13px;min-height:1.2em}
 .offlist{display:flex;flex-wrap:wrap;gap:6px}
 .offchip{display:inline-flex;gap:6px;align-items:center;padding:2px 4px 2px 10px;border:1px solid var(--line);border-radius:999px;font-family:var(--mono);font-size:13px}
@@ -261,6 +263,7 @@ label.f input,label.f select{color:var(--fg);background:var(--surface-2);border:
     <div class="row2">
       <label class="f">溶接の時間 h<input id="f-wel" type="number" min="0" step="0.5" enterkeyhint="done"></label>
     </div>
+    <p class="sumnote" id="sumNote"></p>
     <label class="f">この会社だけの残業 h（空なら全体の残業の値）<input id="f-ot" type="number" min="0" max="12" step="0.5" enterkeyhint="done"></label>
     <label class="f">置き場所<select id="f-team"></select></label>
     <label class="f">メモ<input id="f-memo" autocomplete="off" maxlength="120"></label>
@@ -530,9 +533,9 @@ function jobHTML(r,i){
   var j=r.job,st=r.status,un=!!r.unassigned;
   var dim=(state.filter&&state.filter!==j.company)?' dim':'';
   var pill='';
-  if(st==='late')pill='<span class="pill bad">遅れ '+r.n+'日</span>';
-  else if(st==='warn')pill='<span class="pill warn">ギリギリ 余裕'+r.n+'日</span>';
-  else if(st==='ok')pill='<span class="pill ok">余裕 '+r.n+'日</span>';
+  if(st==='late')pill='<span class="pill bad">納期遅れ '+r.n+'日</span>';
+  else if(st==='warn')pill='<span class="pill warn">注意 '+(r.n>0?r.n+'日前':'当日')+'</span>';
+  else if(st==='ok')pill='<span class="pill ok">OK '+r.n+'日前</span>';
   var shipTxt=shipLabel(j);
   var hours='<div class="hl"><span class="k">全</span><span class="v">'+num(j.totalH)+'h</span></div>'+
     '<div class="hl"><span class="k">組</span><span class="v">'+num(j.asmH)+'h</span></div>'+
@@ -540,7 +543,8 @@ function jobHTML(r,i){
     (j.hdrH>0?'<div class="hl"><span class="k">ヘッダー</span><span class="v">'+num(j.hdrH)+'h</span></div>':'')+
     (j.finH>0?'<div class="hl"><span class="k">フィン抜き</span><span class="v">'+num(j.finH)+'h</span></div>':'')+
     (j.kakH>0?'<div class="hl"><span class="k">拡管</span><span class="v">'+num(j.kakH)+'h</span></div>':'')+
-    (j.weldH>0?'<div class="hl"><span class="k">溶接</span><span class="v">'+num(j.weldH)+'h</span></div>':'');
+    (j.weldH>0?'<div class="hl"><span class="k">溶接</span><span class="v">'+num(j.weldH)+'h</span></div>':'')+
+    (Math.abs((+j.totalH||0)-partsSum(j))>=0.05?'<div class="sumwarn">全と内訳が '+hh(Math.abs((+j.totalH||0)-partsSum(j)))+'h ちがう</div>':'');
   var dates;
   if(r.days>0&&r.start!=null){
     dates='<div class="dl"><span class="tg kai">開</span><span class="d">'+fmt(r.start)+'</span></div>'+
@@ -549,7 +553,7 @@ function jobHTML(r,i){
   else{var ln0=laneById(j.team);dates='<span class="muted">'+(ln0&&ln0.people<=0&&j.asmH>0?'0人の列なので、日程は出しません':'時間が入っていません')+'</span>';}
   if(r.manual){
     var df=r.avail-r.need;
-    dates+='<div class="cmp '+(df<-0.05?'bad':'ok')+'"><span class="t">決めた日程</span><span>期間の時間 <b>'+hh(r.avail)+'h</b></span><span>必要 <b>'+hh(r.need)+'h</b></span><span class="df">'+(df<-0.05?'足りない '+hh(-df)+'h':'余り +'+hh(df)+'h')+'</span></div>';
+    dates+='<div class="cmp '+(df<-0.05?'bad':'ok')+'"><span class="t">決めた日程</span><span>期間の時間 <b>'+hh(r.avail)+'h</b></span><span>必要 <b>'+hh(r.need)+'h</b></span><span class="df">'+(df<-0.05?'−'+hh(-df)+'h':'＋'+hh(df)+'h')+'</span></div>';
   }
   return '<article class="job st-'+st+dim+(j.memo?' has-memo':'')+'" draggable="true" data-id="'+esc(j.id)+'">'+
     '<div class="j-id"><span class="seq" title="順番">'+(i+1)+'</span></div>'+
@@ -618,7 +622,7 @@ function render(){
   $('satVal').textContent=s.sat>0?num(s.sat)+'人':'休み';
   $('holVal').textContent=s.hol>0?num(s.hol)+'人':'休み';
   $('pills').innerHTML='<span class="pill">作業者 '+num(cfg.people)+'人</span><span class="pill">案件 '+total+'件</span><span class="pill">列 '+lanes.length+'つ</span>'+
-    '<span class="pill bad">遅れ '+late+'件</span><span class="pill warn">ギリギリ '+warn+'件</span><span class="pill ok">余裕あり '+ok+'件</span>';
+    '<span class="pill bad">納期遅れ '+late+'件</span><span class="pill warn">注意 '+warn+'件</span><span class="pill ok">OK '+ok+'件</span>';
   $('filters').innerHTML=companies.length
     ?'<span class="lbl">会社で絞り込み</span><button class="fchip" data-act="filter" data-company="" aria-pressed="'+(!state.filter)+'" type="button">すべて</button>'+
       companies.map(function(c){return '<button class="fchip" data-act="filter" data-company="'+esc(c)+'" style="--h:'+hue(c)+'" aria-pressed="'+(state.filter===c)+'" type="button">'+esc(c)+'</button>';}).join('')
@@ -731,7 +735,7 @@ function openJob(id,team,focusMemo){
   $('f-ship').value=j?j.ship:'';$('f-ym').value=j?j.shipYm:'';$('f-smode').value=j?(j.shipMode==='jun'?(j.shipPart||'上'):(j.shipMode||'date')):'date';$('f-ot').value=(j&&j.otH!=='')?j.otH:'';$('f-pstart').value=j?j.planStart:'';$('f-pend').value=j?j.planEnd:'';syncShip();$('f-total').value=j?j.totalH:'';$('f-asm').value=j?j.asmH:'';
   $('f-tmp').value=j?j.tempH:'';$('f-hdr').value=j?j.hdrH:'';$('f-fin').value=j&&j.finH?j.finH:'';$('f-kak').value=j&&j.kakH?j.kakH:'';$('f-wel').value=j&&j.weldH?j.weldH:'';
   $('f-team').value=j?j.team:(team||state.settings.lanes[0].id);$('f-memo').value=j?j.memo:'';
-  $('jobErr').textContent='';
+  $('jobErr').textContent='';updSumNote();
   var del=$('f-del');del.hidden=!j;del.dataset.armed='0';del.textContent='削除';
   $('jobDlg').showModal();
   if(focusMemo)$('f-memo').focus();
@@ -748,6 +752,18 @@ function syncShip(){
   $('planNote').textContent=mx!=null?'選べるのは '+fmt(mx)+' まで（出荷日の'+state.settings.buffer+'稼働日前）':'';
 }
 ['f-smode','f-ship','f-ym'].forEach(function(id){$(id).addEventListener('change',syncShip);});
+var PARTS=['f-asm','f-tmp','f-hdr','f-fin','f-kak','f-wel'];
+function partsSum(j){return (+j.asmH||0)+(+j.tempH||0)+(+j.hdrH||0)+(+j.finH||0)+(+j.kakH||0)+(+j.weldH||0);}
+function updSumNote(){
+  var sum=0;PARTS.forEach(function(id){var v=parseFloat($(id).value);if(isFinite(v))sum+=v;});
+  var tv=$('f-total').value.trim(),el=$('sumNote');
+  if(tv===''&&sum<=0){el.textContent='';el.className='sumnote';return;}
+  if(tv===''){el.textContent='内訳の合計 '+hh(sum)+'h（全が空なので、保存すると全に '+hh(sum)+'h を入れます）';el.className='sumnote ok';return;}
+  var t=parseFloat(tv)||0,d=t-sum;
+  if(Math.abs(d)<0.05){el.textContent='内訳の合計 '+hh(sum)+'h ／ 全 '+hh(t)+'h　合っています';el.className='sumnote ok';}
+  else{el.textContent='内訳の合計 '+hh(sum)+'h ／ 全 '+hh(t)+'h　'+hh(Math.abs(d))+'h 合わない';el.className='sumnote bad';}
+}
+['f-total'].concat(PARTS).forEach(function(id){$(id).addEventListener('input',updSumNote);});
 function numOf(id){var v=$(id).value.trim();if(v==='')return 0;var x=parseFloat(v);return isFinite(x)?x:NaN;}
 $('jobForm').addEventListener('submit',function(e){
   e.preventDefault();
@@ -769,6 +785,7 @@ $('jobForm').addEventListener('submit',function(e){
   var ov=$('f-ot').value.trim();j.otH=(ov===''||!isFinite(parseFloat(ov))||parseFloat(ov)<0)?'':Math.min(12,parseFloat(ov));
   j.shipMode=(sm==='date'||sm==='tbd')?sm:'jun';j.shipPart=(sm==='中'||sm==='下')?sm:'上';j.shipYm=ym;j.planStart=pst;j.planEnd=pen;
   j.company=company;j.model=$('f-model').value.trim();j.qty=isFinite(qty)&&qty>0?qty:1;j.ship=sm==='date'?ship:'';
+  if($('f-total').value.trim()==='')total=asm+tmp+hdr+fin+kak+wel;
   j.totalH=total;j.asmH=asm;j.tempH=tmp;j.hdrH=hdr;j.finH=fin;j.kakH=kak;j.weldH=wel;j.team=team;j.memo=$('f-memo').value.trim();j.sample=false;
   persistJob(j);$('jobDlg').close();render();
 });
@@ -814,7 +831,7 @@ var FAM='"IBM Plex Sans JP","Hiragino Sans","Yu Gothic",Meiryo,"Noto Sans CJK JP
 var pdfCanvases=[],pdfLand=true;
 function ensureFonts(){
   if(!document.fonts||!document.fonts.load)return Promise.resolve();
-  var sample='工程管理表出荷全組仮ヘッダー分流器開完日遅れ余裕月稼働合計残り未定0123456789ギリフィン抜き拡管溶接その他'+state.jobs.map(function(j){return j.company+j.model;}).join('');
+  var sample='工程管理表出荷全組仮ヘッダー分流器開完日遅れ余裕月稼働合計残り未定0123456789ギリフィン抜き拡管溶接その他納期注意OK前当内訳合わない−＋'+state.jobs.map(function(j){return j.company+j.model;}).join('');
   var all=Promise.all(['400','500','600','700'].map(function(w){return document.fonts.load(w+' 16px "IBM Plex Sans JP"',sample);}));
   return Promise.race([all,new Promise(function(r){setTimeout(r,2500);})]).catch(function(){});
 }
@@ -868,9 +885,9 @@ function buildSheets(opt){
     if(j.otH!==''&&j.otH!=null)tx('残業'+num(j.otH)+'h',x+w-1.8,yy+9.6,7.5,'600','#8a5200','right');
     tx(j.company||'—',x+6,yy+5,10.5,'700','#111','left',w*0.62-6);
     var lab='',col='#333';
-    if(r.status==='late'){lab='遅れ'+r.n+'日';col='#b0241c';}
-    else if(r.status==='warn'){lab='ギリギリ';col='#8a5200';}
-    else if(r.status==='ok'){lab='余裕'+r.n+'日';col='#17794a';}
+    if(r.status==='late'){lab='納期遅れ'+r.n+'日';col='#b0241c';}
+    else if(r.status==='warn'){lab='注意 '+(r.n>0?r.n+'日前':'当日');col='#8a5200';}
+    else if(r.status==='ok'){lab='OK '+r.n+'日前';col='#17794a';}
     if(lab)tx(lab,x+w-1.8,yy+5,8.5,'700',col,'right');
     tx(j.model+(j.qty?'  ×'+num(j.qty)+'台':''),x+6,yy+9.6,8.5,'500','#222','left',w-8);
     var ex=[];if(j.tempH>0)ex.push('仮組 '+hm(j.tempH));if(j.hdrH>0)ex.push('ヘッダー '+hm(j.hdrH));if(j.finH>0)ex.push('フィン抜き '+hm(j.finH));if(j.kakH>0)ex.push('拡管 '+hm(j.kakH));if(j.weldH>0)ex.push('溶接 '+hm(j.weldH));
@@ -898,7 +915,7 @@ function buildSheets(opt){
     var yb=yy+CARD-1.2;
     if(r.manual){
       var df=r.avail-r.need,c2=df<-0.05?'#b0241c':'#17794a';
-      var dtxt=(df<-0.05?'足りない '+hm(-df):'余り +'+hm(df));
+      var dtxt=(df<-0.05?'−'+hm(-df):'＋'+hm(df));
       if(narrow){
         tx('決めた日程 期間'+hm(r.avail)+'／必要'+hm(r.need),x+1.8,yb+3.2,7,'600',c2,'left',w-3.6);
         tx(dtxt,x+1.8,yb+7.4,8,'700',c2,'left',w-3.6);
