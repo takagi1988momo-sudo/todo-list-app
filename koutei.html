@@ -736,7 +736,7 @@ $('f-cancel').addEventListener('click',function(){$('jobDlg').close();});
 $('jobForm').addEventListener('keydown',function(e){
   if(e.key!=='Enter'||e.isComposing||e.keyCode===229)return;
   var t=e.target;if(!t||t.tagName!=='INPUT')return;
-  e.preventDefault();$('jobForm').requestSubmit();
+  e.preventDefault();t.blur();
 });
 $('f-del').addEventListener('click',function(){
   var j=editingId?byId(editingId):null;if(!j)return;
