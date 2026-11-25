@@ -577,7 +577,7 @@ function laneHTML(l,res){
     '<input class="lane-name-in" data-lane="'+esc(t)+'" value="'+esc(l.name)+'" placeholder="列の名前" maxlength="20" aria-label="列の名前">'+
     '<div class="stepper"><button class="sbtn" data-act="ppl-" data-team="'+esc(t)+'" aria-label="人数を減らす" type="button">−</button><h2 class="lane-name">'+num(l.people)+'人</h2><button class="sbtn" data-act="ppl+" data-team="'+esc(t)+'" aria-label="人数を増やす" type="button">＋</button></div>'+
     '<p class="sec-sum">平日1日 <b>'+num(perDay)+'h</b> ・ <b>'+res.length+'件</b> ・ 最終 <b>'+last+'</b></p>'+
-    '<div class="lane-tools">'+(l.people>0&&res.length>=2?'<button class="tbtn" data-act="lane-sort" data-team="'+esc(t)+'" type="button">日付順に並べる</button>':'<span></span>')+
+    '<div class="lane-tools">'+(l.people>0&&res.length>=2?'<button class="tbtn" data-act="lane-sort" data-team="'+esc(t)+'" type="button">出荷日順に並べる</button>':'<span></span>')+
     '<button class="lane-del" data-act="lane-del" data-team="'+esc(t)+'" type="button">この列を削除</button></div></div>'+
     '<div class="lane-list" data-team="'+esc(t)+'">'+(cards||'<p class="lane-empty">案件がありません。ほかの列からドラッグするか、下のボタンで追加します。</p>')+'</div>'+
     '<button class="lane-add" data-act="add" data-team="'+esc(t)+'" type="button">＋ 案件を追加</button></section>';
@@ -653,11 +653,11 @@ function moveJob(id,team,index){
 }
 function sortLane(team){
   var L=model&&model.lanes.filter(function(x){return x.t===team;})[0];if(!L)return;
-  var arr=L.res.map(function(r,i){return {j:r.job,i:i,k:r.start!=null?r.start:Infinity};});
+  var arr=L.res.map(function(r,i){var sd=shipDnOf(r.job);return {j:r.job,i:i,k:sd!=null?sd:Infinity};});
   arr.sort(function(a,b){return (a.k-b.k)||(a.i-b.i);});
-  if(arr.every(function(a,i){return a.i===i;})){toast('もう日付順に並んでいます。');return;}
+  if(arr.every(function(a,i){return a.i===i;})){toast('もう出荷日順に並んでいます。');return;}
   arr.forEach(function(a,i){var np=i+1;if(a.j.pos!==np){a.j.pos=np;persistJob(a.j);}});
-  render();toast('開始日の早い順に並べました。');
+  render();toast('出荷日の早い順に並べました。');
 }
 function cardsIn(list){return Array.prototype.slice.call(list.querySelectorAll('.job')).filter(function(c){return c.dataset.id!==dragId;});}
 function indexAt(list,y){
