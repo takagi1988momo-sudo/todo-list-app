@@ -347,7 +347,7 @@ function ymOf(dn){return toStr(dn).slice(0,7);}
 function kindOf(dn){if(HOLIDAYS.has(toStr(dn)))return 'hol';if(dow(dn)===6)return 'sat';return null;}
 function isWork(dn,c){if(dow(dn)===0)return false;if(c.off.has(toStr(dn)))return false;var k=kindOf(dn);if(k==='hol')return c.hol>0;if(k==='sat')return c.sat>0;return true;}
 function pday(ppl,c){return ppl*c.reg+Math.min(c.otp,ppl)*c.ot;}
-function dayCap(dn,c){if(!isWork(dn,c))return 0;var k=kindOf(dn);return pday(k==='hol'?c.hol:k==='sat'?c.sat:c.people,c);}
+function dayCap(dn,c){if(!isWork(dn,c))return 0;var k=kindOf(dn);if(k==='hol'||k==='sat')return (k==='hol'?c.hol:c.sat)*c.reg;return pday(c.people,c);}
 function nextWork(dn,c){var n=0;while(!isWork(dn,c)&&n<400){dn++;n++;}return dn;}
 function prevWork(dn,c){var n=0;while(!isWork(dn,c)&&n<400){dn--;n++;}return dn;}
 function deadlineOf(ship,buf,c){var d=ship;if(buf<=0)return prevWork(d,c);for(var i=0;i<buf;i++){d=prevWork(d-1,c);}return d;}
@@ -577,7 +577,7 @@ function monthsHTML(rows,s,tp){
   var perDay=pday(tp,cfgOf());
   return '<div class="panel-head"><h2>月ごとの時間</h2><div class="stepper box"><span class="st-l">作業者</span><button class="sbtn" data-act="wk-" aria-label="作業者を減らす" type="button">−</button><span class="sval">'+num(s.workers)+'人</span><button class="sbtn" data-act="wk+" aria-label="作業者を増やす" type="button">＋</button></div></div>'+
     '<div class="mwrap"><table class="mt"><thead><tr><th>月</th><th>稼働日</th><th>合計</th><th>組立</th><th>仮組</th><th>ヘッダー・分流器</th><th>その他 h</th><th>残り</th></tr></thead><tbody>'+body+'</tbody></table></div>'+
-    '<p class="hint">作業者は '+num(tp)+'人。平日1日の時間 ＝ '+num(tp)+'人 × '+num(s.reg)+'h ＝ '+num(tp*s.reg)+'h。残業を足すと、残業する '+num(Math.min(s.otp,tp))+'人の分だけプラスします'+(s.ot>0?'（残業 '+num(s.ot)+'h × '+num(Math.min(s.otp,tp))+'人 ＝ '+num(Math.min(s.otp,tp)*s.ot)+'h。1日 '+num(perDay)+'h）':'（いまは残業なし）')+'。土曜は '+num(s.sat)+'人、祝日は '+num(s.hol)+'人で数えます（0人は休み）。最初の月は開始日からの分です。「その他」は案件に入らない時間（片付けなど）を月ごとに自分で入れます。残り ＝ 合計 − 組立 − 仮組 − ヘッダー・分流器 − その他。</p>';
+    '<p class="hint">作業者は '+num(tp)+'人。平日1日の時間 ＝ '+num(tp)+'人 × '+num(s.reg)+'h ＝ '+num(tp*s.reg)+'h。残業を足すと、残業する '+num(Math.min(s.otp,tp))+'人の分だけプラスします'+(s.ot>0?'（残業 '+num(s.ot)+'h × '+num(Math.min(s.otp,tp))+'人 ＝ '+num(Math.min(s.otp,tp)*s.ot)+'h。1日 '+num(perDay)+'h）':'（いまは残業なし）')+'。土曜は '+num(s.sat)+'人、祝日は '+num(s.hol)+'人で数えます（1人 '+num(s.reg)+'h。土曜・祝日は残業を足しません。0人は休み）。最初の月は開始日からの分です。「その他」は案件に入らない時間（片付けなど）を月ごとに自分で入れます。残り ＝ 合計 − 組立 − 仮組 − ヘッダー・分流器 − その他。</p>';
 }
 function render(){
   if(dragging){pendingRender=true;return;}
