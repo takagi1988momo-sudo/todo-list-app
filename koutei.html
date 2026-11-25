@@ -483,7 +483,7 @@ function fixOrphans(){
   });
 }
 function cfgOf(){var s=state.settings;return {start:toDn(s.start),reg:s.reg,ot:s.ot,otp:s.otp,other:s.other,sat:s.sat,hol:s.hol,people:s.workers,laneSum:totalPeople(),buffer:s.buffer,deduct:false,off:new Set(s.off)};}
-function laneCfg(c,p){var o={},k;for(k in c)o[k]=c[k];o.people=p;o.otp=c.laneSum>0?c.otp*p/c.laneSum:0;o.hol=c.laneSum>0?c.hol*p/c.laneSum:0;o.sat=c.laneSum>0?c.sat*p/c.laneSum:0;return o;}
+function laneCfg(c,p){var o={},k,base=Math.max(c.people,c.laneSum);for(k in c)o[k]=c[k];o.people=p;o.otp=base>0?c.otp*p/base:0;o.hol=base>0?c.hol*p/base:0;o.sat=base>0?c.sat*p/base:0;return o;}
 function laneTitle(l,i){return (l.name?l.name+'　':'')+num(l.people)+'人';}
 function teamLabel(id){var l=laneById(id),i=state.settings.lanes.indexOf(l);return l?(i+1)+'番目の列　'+laneTitle(l):'';}
 function jobsOf(t){return state.jobs.filter(function(j){return j.team===t;}).sort(function(a,b){return (a.pos-b.pos)||(a.id<b.id?-1:1);});}
