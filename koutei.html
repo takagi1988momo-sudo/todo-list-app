@@ -252,6 +252,10 @@ label.f input,label.f select{color:var(--fg);background:var(--surface-2);border:
       <label class="f">仮組立の時間 h<input id="f-tmp" type="number" min="0" step="0.5" enterkeyhint="done"></label>
       <label class="f">ヘッダー・分流器制作の時間 h<input id="f-hdr" type="number" min="0" step="0.5" enterkeyhint="done"></label>
     </div>
+    <div class="row2">
+      <label class="f">フィン抜きの時間 h<input id="f-fin" type="number" min="0" step="0.5" enterkeyhint="done"></label>
+      <label class="f">拡管の時間 h<input id="f-kak" type="number" min="0" step="0.5" enterkeyhint="done"></label>
+    </div>
     <label class="f">この会社だけの残業 h（空なら全体の残業の値）<input id="f-ot" type="number" min="0" max="12" step="0.5" enterkeyhint="done"></label>
     <label class="f">置き場所<select id="f-team"></select></label>
     <label class="f">メモ<input id="f-memo" autocomplete="off" maxlength="120"></label>
@@ -360,7 +364,7 @@ function consume(cur,need,c,fn){
     var t=Math.min(need,cur.left);need-=t;cur.left-=t;fn(cur.d,t);
   }
 }
-function addUse(use,dn,cat,h){var k=ymOf(dn);var u=use[k]||(use[k]={asm:0,tmp:0,hdr:0,und:0,extra:0});u[cat]+=h;}
+function addUse(use,dn,cat,h){var k=ymOf(dn);var u=use[k]||(use[k]={asm:0,tmp:0,hdr:0,fin:0,kak:0,und:0,extra:0});u[cat]+=h;}
 function schedule(list,c,cur,use){
   var c0=c;
   return list.map(function(job){
@@ -373,7 +377,7 @@ function schedule(list,c,cur,use){
       first=nextWork(ps,c);last=prevWork(pe,c);if(last<first)last=first;
       var wd=[],dd;for(dd=first;dd<=last;dd++){if(isWork(dd,c))wd.push(dd);}
       if(!wd.length)wd=[first];
-      [['hdr',job.hdrH],['tmp',job.tempH],['asm',job.asmH]].forEach(function(sg){
+      [['hdr',job.hdrH],['tmp',job.tempH],['fin',job.finH],['kak',job.kakH],['asm',job.asmH]].forEach(function(sg){
         var need=+sg[1]||0;if(need<=0)return;
         wd.forEach(function(d){addUse(use,d,sg[0],need/wd.length);});
       });
@@ -389,7 +393,7 @@ function schedule(list,c,cur,use){
       if(first!=null){for(d2=first;d2<=last;d2++){if(isWork(d2,c))w2.push(d2);}}
       if(!w2.length)w2=[cc.d];
       if(cc!==cur&&cc.d>=cur.d){cur.left=cc.d>cur.d?cc.left:Math.min(cc.left,cur.left);cur.d=cc.d;}
-      [['hdr',job.hdrH],['tmp',job.tempH]].forEach(function(sg){
+      [['hdr',job.hdrH],['tmp',job.tempH],['fin',job.finH],['kak',job.kakH]].forEach(function(sg){
         var need=+sg[1]||0;if(need<=0)return;
         w2.forEach(function(d){addUse(use,d,sg[0],need/w2.length);});
       });
@@ -412,10 +416,10 @@ function monthRows(c,use,lastDn,und){
     var first=Math.floor(Date.UTC(y,m,1)/DAY),next=Math.floor(Date.UTC(y,m+1,1)/DAY);
     var from=Math.max(first,d0),days=0,cap=0;
     for(var d=from;d<next;d++){if(isWork(d,c)){days++;cap+=dayCap(d,c);}}
-    var u=use[y+'-'+String(m+1).padStart(2,'0')]||{asm:0,tmp:0,hdr:0,und:0,extra:0};
+    var u=use[y+'-'+String(m+1).padStart(2,'0')]||{asm:0,tmp:0,hdr:0,fin:0,kak:0,und:0,extra:0};
     cap+=(u.extra||0);
-    var free=Math.max(0,cap-u.asm-u.tmp-u.hdr),take=Math.min(free,left);left-=take;
-    var key=y+'-'+String(m+1).padStart(2,'0'),oth=(c.other&&c.other[key])||0,fin=(c.fin&&c.fin[key])||0,kak=(c.kak&&c.kak[key])||0;
+    var free=Math.max(0,cap-u.asm-u.tmp-u.hdr-u.fin-u.kak),take=Math.min(free,left);left-=take;
+    var key=y+'-'+String(m+1).padStart(2,'0'),oth=(c.other&&c.other[key])||0,fin=u.fin||0,kak=u.kak||0;
     var rest=cap-u.asm-u.tmp-u.hdr-take-fin-kak-oth;if(rest<0.0001)rest=0;
     rows.push({y:y,m:m+1,key:key,days:days,cap:cap,asm:u.asm,tmp:u.tmp,hdr:u.hdr,und:take,fin:fin,kak:kak,oth:oth,rest:rest});
     m++;if(m>11){m=0;y++;}guard++;
@@ -424,7 +428,7 @@ function monthRows(c,use,lastDn,und){
 }
 //#logic-end
 
-var DEF={start:'2027-01-05',reg:7.5,ot:0,sat:2,hol:2,workers:6.5,otp:4,other:{},fin:{},kak:{},buffer:1,deduct:true,off:[],lanes:[{id:'L',name:'A',people:2},{id:'M',name:'B',people:2},{id:'R',name:'C',people:2.5}]};
+var DEF={start:'2027-01-05',reg:7.5,ot:0,sat:2,hol:2,workers:6.5,otp:4,other:{},buffer:1,deduct:true,off:[],lanes:[{id:'L',name:'A',people:2},{id:'M',name:'B',people:2},{id:'R',name:'C',people:2.5}]};
 function clone(o){return JSON.parse(JSON.stringify(o));}
 var state={settings:clone(DEF),jobs:[],mode:'pending',loaded:false,slow:false,failed:false,filter:null};
 var db=null,dl=null,model=null,dragging=false,dragId=null,pendingRender=false,settingsDirty=false,settingsTimer=null,toastTimer=null;
@@ -442,7 +446,7 @@ function normSettings(r){
   if(isFinite(r.reg)&&+r.reg>0)s.reg=Math.min(24,+r.reg);
   if(isFinite(r.ot))s.ot=Math.max(0,Math.min(8,+r.ot));
   if(isFinite(r.hol))s.hol=Math.max(0,Math.min(30,Math.round(+r.hol*2)/2));
-  ['other','fin','kak'].forEach(function(f){if(r[f]&&typeof r[f]==='object'){Object.keys(r[f]).forEach(function(k){var v=+r[f][k];if(/^\d{4}-\d{2}$/.test(k)&&isFinite(v)&&v>0)s[f][k]=Math.min(5000,Math.round(v*2)/2);});}});
+  ['other'].forEach(function(f){if(r[f]&&typeof r[f]==='object'){Object.keys(r[f]).forEach(function(k){var v=+r[f][k];if(/^\d{4}-\d{2}$/.test(k)&&isFinite(v)&&v>0)s[f][k]=Math.min(5000,Math.round(v*2)/2);});}});
   s.otp=(isFinite(r.otp)&&+r.otp>=0)?Math.min(60,Math.round(+r.otp*2)/2):s.otp;
   if(isFinite(r.workers)&&+r.workers>=0.5)s.workers=Math.min(60,Math.round(+r.workers*2)/2);
   s.sat=isFinite(r.sat)?Math.max(0,Math.min(30,Math.round(+r.sat*2)/2)):s.hol;
@@ -463,7 +467,7 @@ function normJob(id,d){
   d=d||{};
   function n(x){return isFinite(x)&&+x>=0?+x:0;}
   return {id:id,company:String(d.company||''),model:String(d.model||''),qty:isFinite(d.qty)&&+d.qty>0?+d.qty:1,ship:String(d.ship||''),
-    totalH:n(d.totalH),asmH:n(d.asmH),tempH:n(d.tempH),hdrH:n(d.hdrH),team:String(d.team||''),otH:(d.otH===''||d.otH==null||!isFinite(d.otH)||+d.otH<0)?'':Math.min(12,+d.otH),shipMode:(d.shipMode==='jun'||d.shipMode==='tbd')?d.shipMode:'date',shipYm:/^\d{4}-\d{2}$/.test(d.shipYm||'')?d.shipYm:'',shipPart:(d.shipPart==='中'||d.shipPart==='下')?d.shipPart:'上',planStart:toDn(d.planStart)!=null?d.planStart:'',planEnd:toDn(d.planEnd)!=null?d.planEnd:'',
+    totalH:n(d.totalH),asmH:n(d.asmH),tempH:n(d.tempH),hdrH:n(d.hdrH),finH:n(d.finH),kakH:n(d.kakH),team:String(d.team||''),otH:(d.otH===''||d.otH==null||!isFinite(d.otH)||+d.otH<0)?'':Math.min(12,+d.otH),shipMode:(d.shipMode==='jun'||d.shipMode==='tbd')?d.shipMode:'date',shipYm:/^\d{4}-\d{2}$/.test(d.shipYm||'')?d.shipYm:'',shipPart:(d.shipPart==='中'||d.shipPart==='下')?d.shipPart:'上',planStart:toDn(d.planStart)!=null?d.planStart:'',planEnd:toDn(d.planEnd)!=null?d.planEnd:'',
     pos:isFinite(d.pos)?+d.pos:0,memo:String(d.memo||''),sample:!!d.sample};
 }
 function laneById(id){return state.settings.lanes.filter(function(l){return l.id===id;})[0]||null;}
@@ -475,7 +479,7 @@ function fixOrphans(){
     if(ids.indexOf(j.team)<0){var l=jobsOf(first);j.team=first;j.pos=l.length?l[l.length-1].pos+1:1;persistJob(j);}
   });
 }
-function cfgOf(){var s=state.settings;return {start:toDn(s.start),reg:s.reg,ot:s.ot,otp:s.otp,other:s.other,fin:s.fin,kak:s.kak,sat:s.sat,hol:s.hol,people:s.workers,laneSum:totalPeople(),buffer:s.buffer,deduct:false,off:new Set(s.off)};}
+function cfgOf(){var s=state.settings;return {start:toDn(s.start),reg:s.reg,ot:s.ot,otp:s.otp,other:s.other,sat:s.sat,hol:s.hol,people:s.workers,laneSum:totalPeople(),buffer:s.buffer,deduct:false,off:new Set(s.off)};}
 function laneCfg(c,p){var o={},k;for(k in c)o[k]=c[k];o.people=p;o.otp=c.laneSum>0?c.otp*p/c.laneSum:0;o.hol=c.laneSum>0?c.hol*p/c.laneSum:0;o.sat=c.laneSum>0?c.sat*p/c.laneSum:0;return o;}
 function laneTitle(l,i){return (l.name?l.name+'　':'')+num(l.people)+'人';}
 function teamLabel(id){var l=laneById(id),i=state.settings.lanes.indexOf(l);return l?(i+1)+'番目の列　'+laneTitle(l):'';}
@@ -492,7 +496,7 @@ function saveLocal(){try{localStorage.setItem('koutei-v1',JSON.stringify({settin
 function loadLocal(){
   try{var raw=localStorage.getItem('koutei-v1');if(raw){var o=JSON.parse(raw);state.settings=normSettings(o.settings);state.jobs=(o.jobs||[]).map(function(j){return normJob(j.id||genId(),j);});}}catch(e){}
 }
-function jobData(j){return {company:j.company,model:j.model,qty:j.qty,ship:j.ship,totalH:j.totalH,asmH:j.asmH,tempH:j.tempH,hdrH:j.hdrH,team:j.team,pos:j.pos,memo:j.memo,sample:!!j.sample,shipMode:j.shipMode||'date',shipYm:j.shipYm||'',shipPart:j.shipPart||'上',planStart:j.planStart||'',planEnd:j.planEnd||'',otH:(j.otH===''||j.otH==null)?'':j.otH};}
+function jobData(j){return {company:j.company,model:j.model,qty:j.qty,ship:j.ship,totalH:j.totalH,asmH:j.asmH,tempH:j.tempH,hdrH:j.hdrH,finH:j.finH||0,kakH:j.kakH||0,team:j.team,pos:j.pos,memo:j.memo,sample:!!j.sample,shipMode:j.shipMode||'date',shipYm:j.shipYm||'',shipPart:j.shipPart||'上',planStart:j.planStart||'',planEnd:j.planEnd||'',otH:(j.otH===''||j.otH==null)?'':j.otH};}
 function persistJob(j){
   if(!db){saveLocal();return;}
   var data=jobData(j);
@@ -528,7 +532,9 @@ function jobHTML(r,i){
   var hours='<div class="hl"><span class="k">全</span><span class="v">'+num(j.totalH)+'h</span></div>'+
     '<div class="hl"><span class="k">組</span><span class="v">'+num(j.asmH)+'h</span></div>'+
     (j.tempH>0?'<div class="hl"><span class="k">仮組</span><span class="v">'+num(j.tempH)+'h</span></div>':'')+
-    (j.hdrH>0?'<div class="hl"><span class="k">ヘッダー</span><span class="v">'+num(j.hdrH)+'h</span></div>':'');
+    (j.hdrH>0?'<div class="hl"><span class="k">ヘッダー</span><span class="v">'+num(j.hdrH)+'h</span></div>':'')+
+    (j.finH>0?'<div class="hl"><span class="k">フィン抜き</span><span class="v">'+num(j.finH)+'h</span></div>':'')+
+    (j.kakH>0?'<div class="hl"><span class="k">拡管</span><span class="v">'+num(j.kakH)+'h</span></div>':'');
   var dates;
   if(r.days>0&&r.start!=null){
     dates='<div class="dl"><span class="tg kai">開</span><span class="d">'+fmt(r.start)+'</span></div>'+
@@ -575,12 +581,12 @@ function monthsHTML(rows,s,tp){
     var label=((i===0||r.m===1)?r.y+'年':'')+r.m+'月';
     function oin(kind,v,nm){return '<td><input class="oin" type="number" min="0" step="0.5" inputmode="decimal" enterkeyhint="done" data-kind="'+kind+'" data-month="'+r.key+'" value="'+(v>0?num(v):'')+'" placeholder="0" aria-label="'+label+'の'+nm+'の時間"></td>';}
     return '<tr><td>'+label+'</td><td>'+r.days+'日</td><td>'+hh(r.cap)+'h</td>'+c(r.asm)+c(r.tmp)+c(r.hdr)+
-      oin('fin',r.fin,'フィン抜き')+oin('kak',r.kak,'拡管')+oin('other',r.oth,'その他')+'<td class="rest'+(r.rest<0.05?' zero':'')+'">'+(r.rest<0.05?'0h':hh(r.rest)+'h')+'</td></tr>';
+      c(r.fin)+c(r.kak)+oin('other',r.oth,'その他')+'<td class="rest'+(r.rest<0.05?' zero':'')+'">'+(r.rest<0.05?'0h':hh(r.rest)+'h')+'</td></tr>';
   }).join('');
   var perDay=pday(tp,cfgOf());
   return '<div class="panel-head"><h2>月ごとの時間</h2><div class="stepper box"><span class="st-l">作業者</span><button class="sbtn" data-act="wk-" aria-label="作業者を減らす" type="button">−</button><span class="sval">'+num(s.workers)+'人</span><button class="sbtn" data-act="wk+" aria-label="作業者を増やす" type="button">＋</button></div></div>'+
-    '<div class="mwrap"><table class="mt"><thead><tr><th>月</th><th>稼働日</th><th>合計</th><th>組立</th><th>仮組</th><th>ヘッダー・分流器</th><th>フィン抜き h</th><th>拡管 h</th><th>その他 h</th><th>残り</th></tr></thead><tbody>'+body+'</tbody></table></div>'+
-    '<p class="hint">作業者は '+num(tp)+'人。平日1日の時間 ＝ '+num(tp)+'人 × '+num(s.reg)+'h ＝ '+num(tp*s.reg)+'h。残業を足すと、残業する '+num(Math.min(s.otp,tp))+'人の分だけプラスします'+(s.ot>0?'（残業 '+num(s.ot)+'h × '+num(Math.min(s.otp,tp))+'人 ＝ '+num(Math.min(s.otp,tp)*s.ot)+'h。1日 '+num(perDay)+'h）':'（いまは残業なし）')+'。土曜は '+num(s.sat)+'人、祝日は '+num(s.hol)+'人で数えます（1人 '+num(s.reg)+'h。土曜・祝日は残業を足しません。0人は休み）。最初の月は開始日からの分です。「フィン抜き」「拡管」「その他」は、月ごとに自分で時間を入れます（「その他」は片付けなど案件に入らない時間）。残り ＝ 合計 − 組立 − 仮組 − ヘッダー・分流器 − フィン抜き − 拡管 − その他。</p>';
+    '<div class="mwrap"><table class="mt"><thead><tr><th>月</th><th>稼働日</th><th>合計</th><th>組立</th><th>仮組</th><th>ヘッダー・分流器</th><th>フィン抜き</th><th>拡管</th><th>その他 h</th><th>残り</th></tr></thead><tbody>'+body+'</tbody></table></div>'+
+    '<p class="hint">作業者は '+num(tp)+'人。平日1日の時間 ＝ '+num(tp)+'人 × '+num(s.reg)+'h ＝ '+num(tp*s.reg)+'h。残業を足すと、残業する '+num(Math.min(s.otp,tp))+'人の分だけプラスします'+(s.ot>0?'（残業 '+num(s.ot)+'h × '+num(Math.min(s.otp,tp))+'人 ＝ '+num(Math.min(s.otp,tp)*s.ot)+'h。1日 '+num(perDay)+'h）':'（いまは残業なし）')+'。土曜は '+num(s.sat)+'人、祝日は '+num(s.hol)+'人で数えます（1人 '+num(s.reg)+'h。土曜・祝日は残業を足しません。0人は休み）。最初の月は開始日からの分です。「その他」は案件に入らない時間（片付けなど）を月ごとに自分で入れます。残り ＝ 合計 − 組立 − 仮組 − ヘッダー・分流器 − フィン抜き − 拡管 − その他。</p>';
 }
 function render(){
   if(dragging){pendingRender=true;return;}
@@ -692,7 +698,7 @@ function openJob(id,team,focusMemo){
   $('jobTitle').textContent=j?'案件を編集':'案件を追加';
   $('f-company').value=j?j.company:'';$('f-model').value=j?j.model:'';$('f-qty').value=j?j.qty:1;
   $('f-ship').value=j?j.ship:'';$('f-ym').value=j?j.shipYm:'';$('f-smode').value=j?(j.shipMode==='jun'?(j.shipPart||'上'):(j.shipMode||'date')):'date';$('f-ot').value=(j&&j.otH!=='')?j.otH:'';$('f-pstart').value=j?j.planStart:'';$('f-pend').value=j?j.planEnd:'';syncShip();$('f-total').value=j?j.totalH:'';$('f-asm').value=j?j.asmH:'';
-  $('f-tmp').value=j?j.tempH:'';$('f-hdr').value=j?j.hdrH:'';
+  $('f-tmp').value=j?j.tempH:'';$('f-hdr').value=j?j.hdrH:'';$('f-fin').value=j&&j.finH?j.finH:'';$('f-kak').value=j&&j.kakH?j.kakH:'';
   $('f-team').value=j?j.team:(team||state.settings.lanes[0].id);$('f-memo').value=j?j.memo:'';
   $('jobErr').textContent='';
   var del=$('f-del');del.hidden=!j;del.dataset.armed='0';del.textContent='削除';
@@ -715,7 +721,7 @@ function numOf(id){var v=$(id).value.trim();if(v==='')return 0;var x=parseFloat(
 $('jobForm').addEventListener('submit',function(e){
   e.preventDefault();
   var company=$('f-company').value.trim(),ship=$('f-ship').value;
-  var total=numOf('f-total'),asm=numOf('f-asm'),tmp=numOf('f-tmp'),hdr=numOf('f-hdr');
+  var total=numOf('f-total'),asm=numOf('f-asm'),tmp=numOf('f-tmp'),hdr=numOf('f-hdr'),fin=numOf('f-fin'),kak=numOf('f-kak');
   var team=$('f-team').value,qty=parseFloat($('f-qty').value);
   if(!company){$('jobErr').textContent='会社名を入れてください。';return;}
   var sm=$('f-smode').value,ym=$('f-ym').value,pst=$('f-pstart').value,pen=$('f-pend').value;
@@ -725,14 +731,14 @@ $('jobForm').addEventListener('submit',function(e){
   var pmx=planMax();
   if(pmx!=null&&((pen&&toDn(pen)>pmx)||(pst&&toDn(pst)>pmx))){$('jobErr').textContent='開始日・完了日は、'+fmt(pmx)+'までです（出荷日の'+state.settings.buffer+'稼働日前）。';return;}
   if(pst&&pen&&toDn(pen)<toDn(pst)){$('jobErr').textContent='完了日は開始日より後にしてください。';return;}
-  if([total,asm,tmp,hdr].some(function(x){return !(x>=0);})){$('jobErr').textContent='時間は0以上の数字で入れてください。';return;}
+  if([total,asm,tmp,hdr,fin,kak].some(function(x){return !(x>=0);})){$('jobErr').textContent='時間は0以上の数字で入れてください。';return;}
   var j=editingId?byId(editingId):null;
   if(!j){var list=jobsOf(team);j={id:genId(),pos:list.length?list[list.length-1].pos+1:1};state.jobs.push(j);}
   else if(j.team!==team){var l2=jobsOf(team);j.pos=l2.length?l2[l2.length-1].pos+1:1;}
   var ov=$('f-ot').value.trim();j.otH=(ov===''||!isFinite(parseFloat(ov))||parseFloat(ov)<0)?'':Math.min(12,parseFloat(ov));
   j.shipMode=(sm==='date'||sm==='tbd')?sm:'jun';j.shipPart=(sm==='中'||sm==='下')?sm:'上';j.shipYm=ym;j.planStart=pst;j.planEnd=pen;
   j.company=company;j.model=$('f-model').value.trim();j.qty=isFinite(qty)&&qty>0?qty:1;j.ship=sm==='date'?ship:'';
-  j.totalH=total;j.asmH=asm;j.tempH=tmp;j.hdrH=hdr;j.team=team;j.memo=$('f-memo').value.trim();j.sample=false;
+  j.totalH=total;j.asmH=asm;j.tempH=tmp;j.hdrH=hdr;j.finH=fin;j.kakH=kak;j.team=team;j.memo=$('f-memo').value.trim();j.sample=false;
   persistJob(j);$('jobDlg').close();render();
 });
 $('f-cancel').addEventListener('click',function(){$('jobDlg').close();});
@@ -836,7 +842,7 @@ function buildSheets(opt){
     else if(r.status==='ok'){lab='余裕'+r.n+'日';col='#17794a';}
     if(lab)tx(lab,x+w-1.8,yy+5,8.5,'700',col,'right');
     tx(j.model+(j.qty?'  ×'+num(j.qty)+'台':''),x+6,yy+9.6,8.5,'500','#222','left',w-8);
-    var ex=[];if(j.tempH>0)ex.push('仮組 '+hm(j.tempH));if(j.hdrH>0)ex.push('ヘッダー '+hm(j.hdrH));
+    var ex=[];if(j.tempH>0)ex.push('仮組 '+hm(j.tempH));if(j.hdrH>0)ex.push('ヘッダー '+hm(j.hdrH));if(j.finH>0)ex.push('フィン抜き '+hm(j.finH));if(j.kakH>0)ex.push('拡管 '+hm(j.kakH));
     if(narrow){
       tx('出荷',x+1.8,yy+14.6,6.5,'500','#555');
       tx(shipLabel(j),x+7.6,yy+15.2,12,'700','#000','left',w-9.4);
