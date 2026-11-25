@@ -881,21 +881,21 @@ function buildSheets(opt){
   var mh;
   if(land){var mw=150;mh=monthTable(MG+CW-mw,MG,mw);y=MG+Math.max(26,mh)+5;}
   else{mh=monthTable(MG,MG+28,CW);y=MG+28+mh+5;}
-  var shown=m.lanes.filter(function(l){return l.res.length>0;});
-  if(!shown.length){tx('案件がありません。',MG+2,y+8,10,'400','#666');}
+  var shown=m.lanes;
   var groupN=4,GAP=2.5,gi,gk;
   for(gi=0;gi<shown.length;gi+=groupN){
     var g=shown.slice(gi,gi+groupN),kc=Math.max(g.length,3),w=(CW-GAP*(kc-1))/kc;narrow=w<70;var idx=g.map(function(){return 0;}),firstPg=true;
     if(gi>0){newPage();contHead();}
-    while(g.some(function(l,k){return idx[k]<l.res.length;})){
+    while(firstPg||g.some(function(l,k){return idx[k]<l.res.length;})){
       if(!firstPg){newPage();contHead();}
-      firstPg=false;
+      var pg1=firstPg;firstPg=false;
       var top=y+6.8;
       g.forEach(function(l,k){
         var x=MG+k*(w+GAP);
         fr(x,y,w,6,'#e6e9ec');
         tx((l.name?l.name+'　':'')+num(l.people)+'人',x+1.8,y+4.3,10,'700','#222','left',w-3);
         var yy=top;
+        if(pg1&&!l.res.length)tx('案件なし',x+1.8,top+5,9,'400','#888','left',w-3.6);
         while(idx[k]<l.res.length){
           var r=l.res[idx[k]],h=cardH(r);
           if(yy+h>H-MG-5)break;
