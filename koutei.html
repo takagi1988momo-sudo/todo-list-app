@@ -241,7 +241,7 @@ label.f input,label.f select{color:var(--fg);background:var(--surface-2);border:
     <label class="f" id="w-ym">何月の旬か<input id="f-ym" type="month"></label>
     <div class="row2">
       <label class="f">開始日（自分で決める。空なら自動）<input id="f-pstart" type="date"></label>
-      <label class="f">完了日（自分で決める）<input id="f-pend" type="date"></label>
+      <label class="f">完了日（空なら時間から自動）<input id="f-pend" type="date"></label>
     </div>
     <p class="hint" id="planNote" style="margin:0"></p>
     <div class="row2">
@@ -381,12 +381,14 @@ function schedule(list,c,cur,use){
       r.manual=true;r.avail=av;r.need=+job.asmH||0;
       if(last>=cur.d){cur.d=nextWork(last+1,c);cur.left=dayCap(cur.d,c);}
     }else{
-      var an=+job.asmH||0;
-      if(an>0)consume(cur,an,c,function(d,t){if(first==null)first=d;last=d;addUse(use,d,'asm',t);
+      var an=+job.asmH||0,cc=cur;
+      if(ps!=null){var sd=nextWork(ps,c);cc={d:sd,left:dayCap(sd,c)};}
+      if(an>0)consume(cc,an,c,function(d,t){if(first==null)first=d;last=d;addUse(use,d,'asm',t);
         if(c!==c0){var cj=dayCap(d,c),cg=dayCap(d,c0);if(cj>0&&cj!==cg)addUse(use,d,'extra',t/cj*(cj-cg));}});
       var w2=[],d2;
       if(first!=null){for(d2=first;d2<=last;d2++){if(isWork(d2,c))w2.push(d2);}}
-      if(!w2.length)w2=[cur.d];
+      if(!w2.length)w2=[cc.d];
+      if(cc!==cur&&cc.d>=cur.d){cur.left=cc.d>cur.d?cc.left:Math.min(cc.left,cur.left);cur.d=cc.d;}
       [['hdr',job.hdrH],['tmp',job.tempH]].forEach(function(sg){
         var need=+sg[1]||0;if(need<=0)return;
         w2.forEach(function(d){addUse(use,d,sg[0],need/w2.length);});
@@ -718,7 +720,7 @@ $('jobForm').addEventListener('submit',function(e){
   var sm=$('f-smode').value,ym=$('f-ym').value,pst=$('f-pstart').value,pen=$('f-pend').value;
   if(sm==='date'&&toDn(ship)==null){$('jobErr').textContent='出荷日を入れてください。決まっていなければ「未定」か「上旬・中旬・下旬」を選んでください。';return;}
   if((sm==='上'||sm==='中'||sm==='下')&&!/^\d{4}-\d{2}$/.test(ym)){$('jobErr').textContent='何月の旬かを入れてください。';return;}
-  if((pst&&!pen)||(!pst&&pen)){$('jobErr').textContent='開始日と完了日は、両方入れるか、両方空にしてください。';return;}
+  if(!pst&&pen){$('jobErr').textContent='完了日を入れるときは、開始日も入れてください。';return;}
   var pmx=planMax();
   if(pmx!=null&&((pen&&toDn(pen)>pmx)||(pst&&toDn(pst)>pmx))){$('jobErr').textContent='開始日・完了日は、'+fmt(pmx)+'までです（出荷日の'+state.settings.buffer+'稼働日前）。';return;}
   if(pst&&pen&&toDn(pen)<toDn(pst)){$('jobErr').textContent='完了日は開始日より後にしてください。';return;}
