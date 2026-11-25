@@ -390,7 +390,7 @@ function schedule(list,c,cur,use){
     }else{
       var an=+job.asmH||0,cc=cur;
       if(ps!=null){var sd=nextWork(ps,c);cc={d:sd,left:dayCap(sd,c)};}
-      if(an>0)consume(cc,an,c,function(d,t){if(first==null)first=d;last=d;addUse(use,d,'asm',t);
+      if(an>0&&c.people>0)consume(cc,an,c,function(d,t){if(first==null)first=d;last=d;addUse(use,d,'asm',t);
         if(c!==c0){var cj=dayCap(d,c),cg=dayCap(d,c0);if(cj>0&&cj!==cg)addUse(use,d,'extra',t/cj*(cj-cg));}});
       var w2=[],d2;
       if(first!=null){for(d2=first;d2<=last;d2++){if(isWork(d2,c))w2.push(d2);}}
@@ -454,7 +454,7 @@ function normSettings(r){
   if(isFinite(r.workers)&&+r.workers>=0.5)s.workers=Math.min(60,Math.round(+r.workers*2)/2);
   s.sat=isFinite(r.sat)?Math.max(0,Math.min(30,Math.round(+r.sat*2)/2)):s.hol;
   if(isFinite(r.buffer)&&+r.buffer>=0)s.buffer=Math.min(30,Math.floor(+r.buffer));
-  function pp(v,d){return (isFinite(v)&&+v>=0.5)?Math.min(30,Math.round(+v*2)/2):d;}
+  function pp(v,d){return (isFinite(v)&&+v>=0)?Math.min(30,Math.round(+v*2)/2):d;}
   if(Array.isArray(r.lanes)&&r.lanes.length){
     var seen={};s.lanes=r.lanes.slice(0,12).map(function(l,i){
       var id=String((l&&l.id)||('l'+i));while(seen[id])id+='x';seen[id]=1;
@@ -544,7 +544,7 @@ function jobHTML(r,i){
     dates='<div class="dl"><span class="tg kai">開</span><span class="d">'+fmt(r.start)+'</span></div>'+
       '<div class="dl"><span class="tg kan">完</span><span class="d">'+fmt(r.end)+'</span><span class="n">'+r.days+'日</span></div>';
   }else if(un){dates='<span class="muted">日程は未定</span>';}
-  else{dates='<span class="muted">時間が入っていません</span>';}
+  else{var ln0=laneById(j.team);dates='<span class="muted">'+(ln0&&ln0.people<=0&&j.asmH>0?'0人の列なので、日程は出しません':'時間が入っていません')+'</span>';}
   if(r.manual){
     var df=r.avail-r.need;
     dates+='<div class="cmp '+(df<-0.05?'bad':'ok')+'"><span class="t">決めた日程</span><span>期間の時間 <b>'+hh(r.avail)+'h</b></span><span>必要 <b>'+hh(r.need)+'h</b></span><span class="df">'+(df<-0.05?'足りない '+hh(-df)+'h':'余り +'+hh(df)+'h')+'</span></div>';
@@ -1006,7 +1006,7 @@ document.addEventListener('click',function(e){
   if(act==='job-del'&&id){var jd=byId(id);if(!jd)return;askConfirm('「'+jd.company+(jd.model?'　'+jd.model:'')+'」の会社を消去します。元に戻せません。よろしいですか？',function(){removeJob(id);render();});return;}
   if(act==='memo'&&id){openJob(id,null,true);return;}
   if(act==='lane-add'){if(s.lanes.length>=12){toast('列は12個までです。');return;}var used=s.lanes.map(function(x){return x.name;}),nm='',ci;for(ci=0;ci<26;ci++){var ch=String.fromCharCode(65+ci);if(used.indexOf(ch)<0){nm=ch;break;}}
-    s.lanes.push({id:newLaneId(),name:nm,people:2});saveSettingsSoon();render();return;}
+    s.lanes.push({id:newLaneId(),name:nm,people:Math.max(0,Math.min(2,Math.floor((s.workers-totalPeople())*2)/2))});saveSettingsSoon();render();return;}
   if(act==='lane-del'){
     var L=laneById(team);if(!L)return;
     if(s.lanes.length<=1){toast('列は最低1つ必要です。');return;}
@@ -1015,8 +1015,8 @@ document.addEventListener('click',function(e){
       s.lanes=s.lanes.filter(function(x){return x.id!==team;});saveSettingsSoon();render();
     });return;
   }
-  if(act==='ppl-'||act==='ppl+'){var tm=laneById(team);if(!tm)return;tm.people=Math.max(0.5,Math.min(30,tm.people+(act==='ppl+'?0.5:-0.5)));saveSettingsSoon();render();return;}
-  if(act==='wk-'||act==='wk+'){s.workers=Math.max(0.5,Math.min(60,s.workers+(act==='wk+'?0.5:-0.5)));saveSettingsSoon();render();return;}
+  if(act==='ppl-'||act==='ppl+'){var tm=laneById(team);if(!tm)return;if(act==='ppl+'&&totalPeople()+0.5>s.workers+1e-9){toast('列の人数の合計は、作業者の '+num(s.workers)+'人までです。');return;}tm.people=Math.max(0,Math.min(30,tm.people+(act==='ppl+'?0.5:-0.5)));saveSettingsSoon();render();return;}
+  if(act==='wk-'||act==='wk+'){if(act==='wk-'&&s.workers-0.5<totalPeople()-1e-9){toast('列の人数の合計が '+num(totalPeople())+'人なので、それより少なくできません。先に列の人数を減らしてください。');return;}s.workers=Math.max(0.5,Math.min(60,s.workers+(act==='wk+'?0.5:-0.5)));saveSettingsSoon();render();return;}
   if(act==='sat-'||act==='sat+'){s.sat=Math.max(0,Math.min(30,s.sat+(act==='sat+'?0.5:-0.5)));saveSettingsSoon();render();return;}
   if(act==='hol-'||act==='hol+'){s.hol=Math.max(0,Math.min(30,s.hol+(act==='hol+'?0.5:-0.5)));saveSettingsSoon();render();return;}
   if(act==='otp-'||act==='otp+'){s.otp=Math.max(0,Math.min(60,s.otp+(act==='otp+'?0.5:-0.5)));saveSettingsSoon();render();return;}
