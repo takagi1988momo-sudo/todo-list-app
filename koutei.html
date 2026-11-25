@@ -100,6 +100,7 @@ table.mt{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;m
 .mt tr:last-child td{border-bottom:0}
 .mt td.rest{font-weight:700;font-size:17px;color:var(--ok)}
 .mt td.rest.zero{color:var(--muted)}
+.mt td.rest.neg{color:var(--bad)}
 .mt td.zero{color:var(--muted)}
 .hint{margin:6px 0 0;color:var(--muted);font-size:12.5px}
 
@@ -424,7 +425,7 @@ function monthRows(c,use,lastDn,und){
     cap+=(u.extra||0);
     var free=Math.max(0,cap-u.asm-u.tmp-u.hdr-u.fin-u.kak-u.wel),take=Math.min(free,left);left-=take;
     var key=y+'-'+String(m+1).padStart(2,'0'),oth=(c.other&&c.other[key])||0,fin=u.fin||0,kak=u.kak||0,wel=u.wel||0;
-    var rest=cap-u.asm-u.tmp-u.hdr-take-fin-kak-wel-oth;if(rest<0.0001)rest=0;
+    var rest=cap-u.asm-u.tmp-u.hdr-take-fin-kak-wel-oth;if(Math.abs(rest)<0.0001)rest=0;
     rows.push({y:y,m:m+1,key:key,days:days,cap:cap,asm:u.asm,tmp:u.tmp,hdr:u.hdr,und:take,fin:fin,kak:kak,wel:wel,oth:oth,rest:rest});
     m++;if(m>11){m=0;y++;}guard++;
   }
@@ -587,7 +588,7 @@ function monthsHTML(rows,s,tp){
     var label=((i===0||r.m===1)?r.y+'年':'')+r.m+'月';
     function oin(kind,v,nm){return '<td><input class="oin" type="number" min="0" step="0.5" inputmode="decimal" enterkeyhint="done" data-kind="'+kind+'" data-month="'+r.key+'" value="'+(v>0?num(v):'')+'" placeholder="0" aria-label="'+label+'の'+nm+'の時間"></td>';}
     return '<tr><td>'+label+'</td><td>'+r.days+'日</td><td>'+hh(r.cap)+'h</td>'+c(r.asm)+c(r.tmp)+c(r.hdr)+
-      c(r.fin)+c(r.kak)+c(r.wel)+oin('other',r.oth,'その他')+'<td class="rest'+(r.rest<0.05?' zero':'')+'">'+(r.rest<0.05?'0h':hh(r.rest)+'h')+'</td></tr>';
+      c(r.fin)+c(r.kak)+c(r.wel)+oin('other',r.oth,'その他')+'<td class="rest'+(r.rest<=-0.05?' neg':r.rest<0.05?' zero':'')+'">'+(r.rest<=-0.05?'−'+hh(-r.rest)+'h':r.rest<0.05?'0h':hh(r.rest)+'h')+'</td></tr>';
   }).join('');
   var perDay=pday(tp,cfgOf());
   return '<div class="panel-head"><h2>月ごとの時間</h2><div class="stepper box"><span class="st-l">作業者</span><button class="sbtn" data-act="wk-" aria-label="作業者を減らす" type="button">−</button><span class="sval">'+num(s.workers)+'人</span><button class="sbtn" data-act="wk+" aria-label="作業者を増やす" type="button">＋</button></div></div>'+
@@ -845,8 +846,8 @@ function buildSheets(opt){
     hd.forEach(function(t,k){tx(t,k===0?xs[k]+1.2:xs[k+1]-1.2,y0+3.9,7,'600','#333',k===0?'left':'right');});
     var yy=y0+5.5;
     rows.forEach(function(r,idx){
-      var vals=[((idx===0||r.m===1)?r.y+'年':'')+r.m+'月',r.days+'日',hm(r.cap),r.asm>0.05?hm(r.asm):'—',r.tmp>0.05?hm(r.tmp):'—',r.hdr>0.05?hm(r.hdr):'—',r.fin>0.05?hm(r.fin):'—',r.kak>0.05?hm(r.kak):'—',r.wel>0.05?hm(r.wel):'—',r.oth>0.05?hm(r.oth):'—',r.rest>0.05?hm(r.rest):'0h'];
-      vals.forEach(function(t,k){tx(t,k===0?xs[k]+1.2:xs[k+1]-1.2,yy+3.6,8.5,(k===0||k===10)?'700':'500','#111',k===0?'left':'right');});
+      var vals=[((idx===0||r.m===1)?r.y+'年':'')+r.m+'月',r.days+'日',hm(r.cap),r.asm>0.05?hm(r.asm):'—',r.tmp>0.05?hm(r.tmp):'—',r.hdr>0.05?hm(r.hdr):'—',r.fin>0.05?hm(r.fin):'—',r.kak>0.05?hm(r.kak):'—',r.wel>0.05?hm(r.wel):'—',r.oth>0.05?hm(r.oth):'—',r.rest>0.05?hm(r.rest):r.rest<=-0.05?'−'+hm(-r.rest):'0h'];
+      vals.forEach(function(t,k){tx(t,k===0?xs[k]+1.2:xs[k+1]-1.2,yy+3.6,8.5,(k===0||k===10)?'700':'500',(k===10&&r.rest<=-0.05)?'#b0241c':'#111',k===0?'left':'right');});
       yy+=5;ln(x0,yy,x0+w,yy,'#c9ced3',0.15);
     });
     return 5.5+rows.length*5;
