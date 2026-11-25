@@ -688,15 +688,16 @@ lists.addEventListener('dragstart',function(e){
   try{e.dataTransfer.setData('text/plain',dragId);}catch(_){}
   setTimeout(function(){c.classList.add('dragging');},0);
 });
+function dropListOf(e){var ln=e.target.closest&&e.target.closest('.lane');return ln?ln.querySelector('.lane-list'):null;}
 lists.addEventListener('dragover',function(e){
   if(!dragId)return;
-  var list=e.target.closest&&e.target.closest('.lane-list');if(!list)return;
+  var list=dropListOf(e);if(!list){document.querySelectorAll('.drop-line').forEach(function(n){n.remove();});return;}
   e.preventDefault();e.dataTransfer.dropEffect='move';
   showLine(list,indexAt(list,e.clientY));
 });
 lists.addEventListener('drop',function(e){
   if(!dragId)return;
-  var list=e.target.closest&&e.target.closest('.lane-list');if(!list)return;
+  var list=dropListOf(e);if(!list)return;
   e.preventDefault();
   var id=dragId,team=list.dataset.team,idx=indexAt(list,e.clientY);
   endDrag();moveJob(id,team,idx);
