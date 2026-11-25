@@ -691,6 +691,21 @@ lists.addEventListener('drop',function(e){
   endDrag();moveJob(id,team,idx);
 });
 lists.addEventListener('dragend',function(){if(dragging)endDrag();});
+/* ドラッグ中に画面の上下の端へ近づけたら、自動でスクロールする */
+var asY=null,asRaf=0;
+function asStep(){
+  asRaf=0;if(!dragId||asY==null)return;
+  var h=window.innerHeight,edge=Math.min(120,h*0.18),v=0;
+  if(asY<edge)v=-Math.ceil((edge-asY)/edge*22);
+  else if(asY>h-edge)v=Math.ceil((asY-(h-edge))/edge*22);
+  if(v){window.scrollBy(0,v);asRaf=requestAnimationFrame(asStep);}
+}
+document.addEventListener('dragover',function(e){
+  if(!dragId)return;
+  asY=e.clientY;if(!asRaf)asRaf=requestAnimationFrame(asStep);
+});
+document.addEventListener('dragend',function(){asY=null;});
+document.addEventListener('drop',function(){asY=null;});
 
 /* ---------- 案件の入力 ---------- */
 var editingId=null;
