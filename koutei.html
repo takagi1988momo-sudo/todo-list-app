@@ -408,7 +408,7 @@ function schedule(list,c,cur,use){
       var w2=[],d2;
       if(first!=null){for(d2=first;d2<=last;d2++){if(isWork(d2,c))w2.push(d2);}}
       if(!w2.length)w2=[cc.d];
-      if(cc!==cur&&cc.d>=cur.d){cur.left=cc.d>cur.d?cc.left:Math.min(cc.left,cur.left);cur.d=cc.d;}
+      if(last!=null&&last>=cur.d){cur.d=nextWork(last+1,c);cur.left=dayCap(cur.d,c);}
       [['hdr',job.hdrH],['tmp',job.tempH],['fin',job.finH],['kak',job.kakH],['wel',job.weldH],['dmp',job.dmpH],['pip',job.pipH]].forEach(function(sg){
         var need=+sg[1]||0;if(need<=0)return;
         w2.forEach(function(d){addUse(use,d,sg[0],need/w2.length);});
