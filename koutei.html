@@ -190,7 +190,6 @@ label.f input,label.f select{color:var(--fg);background:var(--surface-2);border:
 .sumwarn{grid-column:1/-1;font-size:12.5px;font-weight:600;color:var(--bad);background:var(--bad-bg);padding:2px 8px;border-radius:6px;justify-self:start}
 input[type=number]{-moz-appearance:textfield;appearance:textfield}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
-.why{margin-top:8px;padding:8px 10px;background:var(--bad-bg);color:var(--bad);border-radius:6px;font-size:12.5px;line-height:1.5}.why ul{margin:4px 0 0;padding-left:1.2em}
 .err{margin:0;color:var(--bad);font-size:13px;min-height:1.2em}
 .offlist{display:flex;flex-wrap:wrap;gap:6px}
 .offchip{display:inline-flex;gap:6px;align-items:center;padding:2px 4px 2px 10px;border:1px solid var(--line);border-radius:999px;font-family:var(--mono);font-size:13px}
@@ -562,7 +561,6 @@ function jobHTML(r,i){
       '<div class="dl"><span class="tg kan">完</span><span class="d">'+fmt(r.end)+'</span><span class="n">'+r.days+'日</span></div>';
   }else if(un){dates='<span class="muted">日程は未定</span>';}
   else{var ln0=laneById(j.team);dates='<span class="muted">'+(ln0&&ln0.people<=0&&j.asmH>0?'0人の列なので、日程は出しません':'時間が入っていません')+'</span>';}
-  if(r.why&&r.why.length)dates+='<div class="why"><b>なぜ間に合わないか</b><ul>'+r.why.map(function(t){return '<li>'+esc(t)+'</li>';}).join('')+'</ul></div>';
   if(r.manual){
     var df=r.avail-r.need;
     dates+='<div class="cmp '+(df<-0.05?'bad':'ok')+'"><span class="t">決めた日程</span><span>期間の時間 <b>'+hh(r.avail)+'h</b></span><span>必要 <b>'+hh(r.need)+'h</b></span><span class="df">'+(df<-0.05?'−'+hh(-df)+'h':'＋'+hh(df)+'h')+'</span></div>';
@@ -625,7 +623,6 @@ function render(){
   });
   var months=monthRows(cfg,use,lastDn,0);
   model={cfg:cfg,lanes:lanes,months:months,tp:cfg.people};
-  lanes.forEach(function(L){L.res.forEach(function(r,i){r.why=r.status==='late'?whyLate(L,i,lanes,cfg):null;});});
   var companies=Array.from(new Set(state.jobs.map(function(j){return j.company;}).filter(Boolean))).sort();
   if(state.filter&&companies.indexOf(state.filter)<0)state.filter=null;
 
@@ -667,27 +664,6 @@ function moveJob(id,team,index){
     job.team=team;
   }else{job.team=team;job.pos=pos;persistJob(job);}
   render();
-}
-function whyLate(L,i,lanes,cfg){
-  var r=L.res[i],j=r.job,c=laneCfg(cfg,L.people),out=[],d;
-  if(r.deadline==null||r.end==null)return out;
-  out.push('締め切りは '+fmt(r.deadline)+'（出荷の'+state.settings.buffer+'稼働日前）、組立が終わるのは '+fmt(r.end)+' です。');
-  if(r.manual){out.push('自分で決めた完了日が、締め切りより後になっています。完了日を早めるか、開始日を早めてください。');return out;}
-  var sj=shipDnOf(j);
-  var later=L.res.slice(0,i).filter(function(p){var a=shipDnOf(p.job);return sj!=null&&(a==null||a>sj);});
-  if(later.length)out.push('出荷がこの会社より遅い '+later.map(function(p){return p.job.company;}).join('・')+' が上に並んでいます。「出荷日順に並べる」で直るかもしれません。');
-  var first=nextWork(c.start,c);
-  if(i>0&&r.start!=null&&r.start>first){var prev=L.res[i-1];if(prev.end!=null)out.push('前の '+prev.job.company+' が '+fmt(prev.end)+' まで作業しているので、始められるのは '+fmt(r.start)+' からです。');}
-  var need=+j.asmH||0;
-  if(r.start!=null&&r.start>r.deadline){out.push('始められる日が、もう締め切りより後です。');}
-  else if(r.start!=null){var av=0;for(d=r.start;d<=r.deadline;d++)av+=dayCap(d,c);
-    if(av<need)out.push(fmt(r.start)+'〜'+fmt(r.deadline)+' にこの列で使える時間は '+hh(av)+'h。組立 '+hh(need)+'h に '+hh(need-av)+'h 足りません。');}
-  var cap=0,tot=0;for(d=first;d<=r.deadline;d++)cap+=dayCap(d,c);
-  L.res.slice(0,i+1).forEach(function(p){if(!p.manual)tot+=(+p.job.asmH||0);});
-  if(tot>cap+0.05)out.push('この列（'+num(L.people)+'人）で締め切りまでに使える時間は '+hh(cap)+'h、この会社までの組立の合計は '+hh(tot)+'h です（'+hh(tot-cap)+'h 足りない）。月ごとの表は全員の時間をまとめて見るので足りて見えますが、この列の人だけでは足りません。');
-  var free=lanes.filter(function(o){if(o===L||o.people<=0)return false;var e=null;o.res.forEach(function(p){if(p.end!=null&&(e==null||p.end>e))e=p.end;});return e==null||e<r.deadline;});
-  if(free.length)out.push('空いている列：'+free.map(function(o){var e=null;o.res.forEach(function(p){if(p.end!=null&&(e==null||p.end>e))e=p.end;});return laneTitle(o.lane)+(e==null?'（空き）':'（'+fmt(e)+' のあと空き）');}).join('、')+'。移すと間に合うかもしれません。');
-  return out;
 }
 function sortLane(team){
   var L=model&&model.lanes.filter(function(x){return x.t===team;})[0];if(!L)return;
