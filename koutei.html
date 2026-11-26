@@ -240,9 +240,11 @@ label.f input,label.f select{color:var(--fg);background:var(--surface-2);border:
       <label class="f">機種<input id="f-model" autocomplete="off" maxlength="40"></label>
       <label class="f">台数<input id="f-qty" type="number" min="1" step="1" inputmode="numeric"></label>
     </div>
-    <label class="f">出荷日の決め方<select id="f-smode"><option value="date">日付で決める</option><option value="上">上旬</option><option value="中">中旬</option><option value="下">下旬</option><option value="tbd">未定</option></select></label>
+    <div class="row2">
+      <label class="f">出荷日の決め方<select id="f-smode"><option value="date">日付で決める</option><option value="上">上旬</option><option value="中">中旬</option><option value="下">下旬</option><option value="tbd">未定</option></select></label>
+      <label class="f" id="w-ym">何月<select id="f-ym"></select></label>
+    </div>
     <label class="f" id="w-ship">出荷日<input id="f-ship" type="date"></label>
-    <label class="f" id="w-ym">何月の旬か<input id="f-ym" type="month"></label>
     <div class="row2">
       <label class="f">開始日（自分で決める。空なら自動）<input id="f-pstart" type="date"></label>
       <label class="f">完了日（空なら時間から自動）<input id="f-pend" type="date"></label>
@@ -732,13 +734,20 @@ function openJob(id,team,focusMemo){
   $('companies').innerHTML=cos.map(function(c){return '<option value="'+esc(c)+'">';}).join('');
   $('jobTitle').textContent=j?'案件を編集':'案件を追加';
   $('f-company').value=j?j.company:'';$('f-model').value=j?j.model:'';$('f-qty').value=j?j.qty:1;
-  $('f-ship').value=j?j.ship:'';$('f-ym').value=j?j.shipYm:'';$('f-smode').value=j?(j.shipMode==='jun'?(j.shipPart||'上'):(j.shipMode||'date')):'date';$('f-ot').value=(j&&j.otH!=='')?j.otH:'';$('f-pstart').value=j?j.planStart:'';$('f-pend').value=j?j.planEnd:'';syncShip();$('f-total').value=j?j.totalH:'';$('f-asm').value=j?j.asmH:'';
+  fillYm(j?j.shipYm:'');$('f-ship').value=j?j.ship:'';$('f-ym').value=j?j.shipYm:'';$('f-smode').value=j?(j.shipMode==='jun'?(j.shipPart||'上'):(j.shipMode||'date')):'date';$('f-ot').value=(j&&j.otH!=='')?j.otH:'';$('f-pstart').value=j?j.planStart:'';$('f-pend').value=j?j.planEnd:'';syncShip();$('f-total').value=j?j.totalH:'';$('f-asm').value=j?j.asmH:'';
   $('f-tmp').value=j?j.tempH:'';$('f-hdr').value=j?j.hdrH:'';$('f-fin').value=j&&j.finH?j.finH:'';$('f-kak').value=j&&j.kakH?j.kakH:'';$('f-wel').value=j&&j.weldH?j.weldH:'';
   $('f-team').value=j?j.team:(team||state.settings.lanes[0].id);$('f-memo').value=j?j.memo:'';
   $('jobErr').textContent='';updSumNote();
   var del=$('f-del');del.hidden=!j;del.dataset.armed='0';del.textContent='削除';
   $('jobDlg').showModal();
   if(focusMemo)$('f-memo').focus();
+}
+function fillYm(cur){
+  var now=new Date(),y=now.getFullYear(),mo=now.getMonth(),st=/^(\d{4})-(\d{2})/.exec(state.settings.start||'');
+  if(st&&(+st[1]*12+(+st[2]-1))<y*12+mo){y=+st[1];mo=+st[2]-1;}
+  var a=y*12+mo-1,list=[],k;for(k=a;k<a+27;k++)list.push(Math.floor(k/12)+'-'+String(k%12+1).padStart(2,'0'));
+  if(cur&&list.indexOf(cur)<0){list.push(cur);list.sort();}
+  $('f-ym').innerHTML='<option value="">月を選ぶ</option>'+list.map(function(v){return '<option value="'+v+'">'+v.slice(0,4)+'年'+(+v.slice(5))+'月</option>';}).join('');
 }
 function planMax(){
   var m=$('f-smode').value,j={shipMode:(m==='date'||m==='tbd')?m:'jun',shipPart:(m==='中'||m==='下')?m:'上',ship:$('f-ship').value,shipYm:$('f-ym').value};
@@ -773,7 +782,7 @@ $('jobForm').addEventListener('submit',function(e){
   if(!company){$('jobErr').textContent='会社名を入れてください。';return;}
   var sm=$('f-smode').value,ym=$('f-ym').value,pst=$('f-pstart').value,pen=$('f-pend').value;
   if(sm==='date'&&toDn(ship)==null){$('jobErr').textContent='出荷日を入れてください。決まっていなければ「未定」か「上旬・中旬・下旬」を選んでください。';return;}
-  if((sm==='上'||sm==='中'||sm==='下')&&!/^\d{4}-\d{2}$/.test(ym)){$('jobErr').textContent='何月の旬かを入れてください。';return;}
+  if((sm==='上'||sm==='中'||sm==='下')&&!/^\d{4}-\d{2}$/.test(ym)){$('jobErr').textContent='上旬・中旬・下旬のときは、何月かを選んでください。';return;}
   if(!pst&&pen){$('jobErr').textContent='完了日を入れるときは、開始日も入れてください。';return;}
   var pmx=planMax();
   if(pmx!=null&&((pen&&toDn(pen)>pmx)||(pst&&toDn(pst)>pmx))){$('jobErr').textContent='開始日・完了日は、'+fmt(pmx)+'までです（出荷日の'+state.settings.buffer+'稼働日前）。';return;}
